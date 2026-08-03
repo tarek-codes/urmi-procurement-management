@@ -3,13 +3,11 @@ import { HistoricalRecord } from "./historicalTypes";
 
 export interface VendorMetricBreakdown {
   currentPriceScore: number;       // 30%
-  historicalPriceScore: number;    // 20%
   winRateScore: number;            // 15%
   deliveryScore: number;           // 10%
   consistencyScore: number;        // 8%
-  trustScore: number;              // 7%
+  trustScore: number;              // 32%
   experienceScore: number;         // 5%
-  recentPerformanceScore: number;  // 5%
 }
 
 export interface VendorItemEvaluation {
@@ -34,14 +32,21 @@ export interface ItemRecommendationResult {
 }
 
 /**
- * Compute Vendor Recommendation & CS Validation Scoring Engine
- * Implements exact metrics and weights specified in cs-metric.md
+ * Compute Supplier Recommendation & CS Validation Scoring Engine
+ * Implements updated 6-metric weights specified in cs-metric.md:
+ * 1. Current CS Price Competitiveness (30%)
+ * 2. Historical Win Rate (15%)
+ * 3. Delivery Performance (10%)
+ * 4. Price Consistency (8%)
+ * 5. Supplier Trust / Loyalty (32%)
+ * 6. Item Experience (5%)
+ * Total = 100%
  */
 export function evaluateItemVendorRecommendations(
   items: CSItem[],
   historicalRecords: HistoricalRecord[]
 ): ItemRecommendationResult[] {
-  // Pre-calculate Global Vendor Trust metrics (Metric 6 - not item-specific)
+  // Pre-calculate Global Supplier Trust metrics (Metric 5: 32% - not item-specific)
   const globalTrustScores = computeGlobalTrustScores(historicalRecords);
 
   return items.map((item) => {
@@ -67,21 +72,7 @@ export function evaluateItemVendorRecommendations(
     // 1. Metric 1: Current CS Price Competitiveness (30%)
     const lowestCurrentQuote = Math.min(...item.quotations.map((q) => q.unitRate));
 
-    // 2. Metric 2: Historical Item-wise Price Competitiveness (20%)
-    const vendorHistAvgRates: Record<string, number> = {};
-    item.quotations.forEach((q) => {
-      const vRecords = itemHistRecords.filter(
-        (r) => r.supplierName.toLowerCase() === q.supplierName.toLowerCase() && r.poRate > 0
-      );
-      if (vRecords.length > 0) {
-        const sum = vRecords.reduce((s, r) => s + r.poRate, 0);
-        vendorHistAvgRates[q.supplierName] = sum / vRecords.length;
-      }
-    });
-    const histAvgRatesList = Object.values(vendorHistAvgRates);
-    const lowestHistAvgRate = histAvgRatesList.length > 0 ? Math.min(...histAvgRatesList) : 0;
-
-    // 3. Metric 3: Historical Win Rate (15%)
+    // 2. Metric 2: Historical Win Rate (15%)
     const totalItemPOs = itemHistRecords.filter((r) => r.poNo).length;
     const vendorWins: Record<string, number> = {};
     item.quotations.forEach((q) => {
@@ -91,7 +82,7 @@ export function evaluateItemVendorRecommendations(
       vendorWins[q.supplierName] = wins;
     });
 
-    // 4. Metric 4: Delivery Performance (10%)
+    // 3. Metric 3: Delivery Performance (10%)
     const vendorAvgDeliveries: Record<string, number> = {};
     item.quotations.forEach((q) => {
       const delRecords = itemHistRecords.filter(
@@ -113,7 +104,7 @@ export function evaluateItemVendorRecommendations(
     const deliveryDaysList = Object.values(vendorAvgDeliveries);
     const fastestDelivery = deliveryDaysList.length > 0 ? Math.min(...deliveryDaysList) : 0;
 
-    // 5. Metric 5: Price Consistency (8%)
+    // 4. Metric 4: Price Consistency (8%)
     const vendorCVs: Record<string, number> = {};
     item.quotations.forEach((q) => {
       const rates = itemHistRecords
@@ -130,12 +121,8 @@ export function evaluateItemVendorRecommendations(
     });
     const maxCV = Math.max(...Object.values(vendorCVs), 0.01);
 
-    // 7. Metric 7: Item Experience (5%)
+    // 6. Metric 6: Item Experience (5%)
     const maxItemPOCount = Math.max(...Object.values(vendorWins), 1);
-
-    // 8. Metric 8: Recent Performance (5%) - Last 12 Months
-    const now = new Date();
-    const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).getTime();
 
     // Evaluate each vendor
     const rawEvaluations: Omit<VendorItemEvaluation, "rank">[] = item.quotations.map((q) => {
@@ -144,66 +131,48 @@ export function evaluateItemVendorRecommendations(
       // 1. Current Price Score (30%)
       const currentPriceScore = q.unitRate > 0 ? Math.round((lowestCurrentQuote / q.unitRate) * 1000) / 10 : 0;
 
-      // 2. Historical Price Score (20%)
-      let historicalPriceScore = 75; // Default score for new vendor
-      if (vendorHistAvgRates[vName] && lowestHistAvgRate > 0) {
-        historicalPriceScore = Math.round((lowestHistAvgRate / vendorHistAvgRates[vName]) * 1000) / 10;
-      }
-
-      // 3. Win Rate Score (15%)
-      let winRateScore = 50; // Neutral default
+      // 2. Win Rate Score (15%)
+      let winRateScore = 50; // Neutral default for new suppliers
       if (totalItemPOs > 0) {
         winRateScore = Math.round(((vendorWins[vName] || 0) / totalItemPOs) * 1000) / 10;
       }
 
-      // 4. Delivery Score (10%)
+      // 3. Delivery Score (10%)
       let deliveryScore = 75;
       if (vendorAvgDeliveries[vName] && fastestDelivery > 0) {
         deliveryScore = Math.round((fastestDelivery / vendorAvgDeliveries[vName]) * 1000) / 10;
       }
 
-      // 5. Consistency Score (8%)
+      // 4. Price Consistency Score (8%)
       const cv = vendorCVs[vName] || 0;
       const consistencyScore = Math.round((1 - cv / (maxCV * 1.2)) * 1000) / 10;
 
-      // 6. Trust Score (7%) - Global
+      // 5. Supplier Trust / Loyalty Score (32%) - Global
       const trustScore = globalTrustScores[vName] || 50;
 
-      // 7. Experience Score (5%)
+      // 6. Item Experience Score (5%)
       const expCount = vendorWins[vName] || 0;
       const experienceScore = Math.round((expCount / maxItemPOCount) * 1000) / 10;
 
-      // 8. Recent Performance (5%)
-      const recentRecords = itemHistRecords.filter(
-        (r) =>
-          r.supplierName.toLowerCase() === vName.toLowerCase() &&
-          r.poDate &&
-          new Date(r.poDate).getTime() >= oneYearAgo
-      );
-      const recentPerformanceScore = recentRecords.length > 0 ? Math.min(100, recentRecords.length * 25) : 50;
-
-      // Weighted Final Score
+      // Weighted Final Score:
+      // (30% Current Price) + (15% Win Rate) + (10% Delivery) + (8% Consistency) + (32% Trust) + (5% Experience) = 100%
       const finalScore = Math.round(
         (0.30 * currentPriceScore +
-          0.20 * historicalPriceScore +
           0.15 * winRateScore +
           0.10 * deliveryScore +
           0.08 * Math.max(0, consistencyScore) +
-          0.07 * trustScore +
-          0.05 * experienceScore +
-          0.05 * recentPerformanceScore) *
+          0.32 * trustScore +
+          0.05 * experienceScore) *
           100
       ) / 100;
 
       const metrics: VendorMetricBreakdown = {
         currentPriceScore,
-        historicalPriceScore,
         winRateScore,
         deliveryScore,
         consistencyScore: Math.max(0, consistencyScore),
         trustScore,
         experienceScore,
-        recentPerformanceScore,
       };
 
       return {
@@ -220,7 +189,7 @@ export function evaluateItemVendorRecommendations(
     // Sort descending by Final Score
     rawEvaluations.sort((a, b) => b.finalScore - a.finalScore);
 
-    // Assign Rank and Generate Reasons
+    // Assign Rank and Generate Explanations
     const evaluations: VendorItemEvaluation[] = rawEvaluations.map((ev, index) => {
       const rank = index + 1;
       const isRecommended = rank === 1;
@@ -234,50 +203,56 @@ export function evaluateItemVendorRecommendations(
           reasonsForSelection.push(`Offered the lowest current unit rate ($${ev.quotation.unitRate.toLocaleString()}).`);
         } else {
           const diffPct = Math.round(((ev.quotation!.unitRate - lowestCurrentQuote) / lowestCurrentQuote) * 100);
-          reasonsForSelection.push(`Quotations are competitive (${diffPct}% above absolute minimum rate), offset by superior historical reliability.`);
+          reasonsForSelection.push(`Competitive current quotation (${diffPct}% above lowest quote), balanced with superior historical trust & delivery.`);
         }
 
-        if (ev.metrics.historicalPriceScore >= 90) {
-          reasonsForSelection.push(`Strong historical pricing competitiveness (${ev.metrics.historicalPriceScore}/100).`);
+        if (ev.metrics.trustScore >= 75) {
+          reasonsForSelection.push(`Long-term trusted supplier with high procurement relationship score (${ev.metrics.trustScore}/100).`);
         }
         if (ev.metrics.winRateScore >= 40) {
-          reasonsForSelection.push(`Proven procurement track record for this item (${ev.metrics.winRateScore}% historical win rate).`);
+          reasonsForSelection.push(`Strong historical selection rate for this item (${ev.metrics.winRateScore}% win rate).`);
         }
         if (ev.metrics.deliveryScore >= 85) {
-          reasonsForSelection.push(`Exceptional delivery speed & fulfillment record (${ev.metrics.deliveryScore}/100 score).`);
+          reasonsForSelection.push(`Fast historical delivery performance (${ev.metrics.deliveryScore}/100 score).`);
         }
-        if (ev.metrics.trustScore >= 80) {
-          reasonsForSelection.push(`High organizational vendor trust & loyalty rating (${ev.metrics.trustScore}/100).`);
+        if (ev.metrics.consistencyScore >= 85) {
+          reasonsForSelection.push(`Stable historical pricing with minimal price fluctuation.`);
+        }
+        if (ev.metrics.experienceScore >= 80) {
+          reasonsForSelection.push(`Extensive historical experience supplying this item.`);
         }
         if (reasonsForSelection.length === 0) {
-          reasonsForSelection.push(`Highest overall composite score (${ev.finalScore}/100) balancing cost, delivery, and reliability.`);
+          reasonsForSelection.push(`Highest overall composite score (${ev.finalScore}/100) balancing price competitiveness with supplier trust & delivery.`);
         }
       } else {
-        // Reasons against selection compared to top recommended vendor
+        // Reasons why NOT selected for non-recommended suppliers
         if (ev.quotation && topEv.quotation && ev.quotation.unitRate > topEv.quotation.unitRate) {
           const diffPct = (
             ((ev.quotation.unitRate - topEv.quotation.unitRate) / topEv.quotation.unitRate) *
             100
           ).toFixed(1);
-          reasonsAgainstSelection.push(`Current quotation ($${ev.quotation.unitRate.toLocaleString()}) is ${diffPct}% higher than recommended supplier.`);
+          reasonsAgainstSelection.push(`Quotation ($${ev.quotation.unitRate.toLocaleString()}) is ${diffPct}% higher than recommended supplier.`);
         } else if (ev.quotation && topEv.quotation && ev.quotation.unitRate < topEv.quotation.unitRate) {
-          reasonsAgainstSelection.push(`Quoted lower rate ($${ev.quotation.unitRate.toLocaleString()}), but has lower historical delivery/reliability scores.`);
+          reasonsAgainstSelection.push(`Quoted lower rate ($${ev.quotation.unitRate.toLocaleString()}), but has lower supplier trust & historical delivery performance.`);
         }
 
-        if (ev.metrics.historicalPriceScore < topEv.metrics.historicalPriceScore - 10) {
-          reasonsAgainstSelection.push(`Historical pricing is less competitive (${ev.metrics.historicalPriceScore} vs ${topEv.metrics.historicalPriceScore}).`);
-        }
-        if (ev.metrics.deliveryScore < topEv.metrics.deliveryScore - 15) {
-          reasonsAgainstSelection.push(`Slower historical lead times & delivery performance.`);
+        if (ev.metrics.trustScore < topEv.metrics.trustScore - 15) {
+          reasonsAgainstSelection.push(`Lower supplier trust / organizational relationship score (${ev.metrics.trustScore} vs ${topEv.metrics.trustScore}).`);
         }
         if (ev.metrics.winRateScore < topEv.metrics.winRateScore - 15) {
-          reasonsAgainstSelection.push(`Lower historical procurement win rate for this item.`);
+          reasonsAgainstSelection.push(`Lower historical win rate for this item.`);
+        }
+        if (ev.metrics.deliveryScore < topEv.metrics.deliveryScore - 15) {
+          reasonsAgainstSelection.push(`Slower average delivery lead times.`);
+        }
+        if (ev.metrics.consistencyScore < topEv.metrics.consistencyScore - 15) {
+          reasonsAgainstSelection.push(`Greater price fluctuations across historical purchase orders.`);
         }
         if (ev.metrics.experienceScore < topEv.metrics.experienceScore - 20) {
-          reasonsAgainstSelection.push(`Less historical experience supplying this specific item code.`);
+          reasonsAgainstSelection.push(`Less historical experience supplying this item.`);
         }
         if (reasonsAgainstSelection.length === 0) {
-          reasonsAgainstSelection.push(`Overall composite score (${ev.finalScore}/100) is lower than recommended supplier (${topEv.finalScore}/100).`);
+          reasonsAgainstSelection.push(`Lower overall weighted score (${ev.finalScore}/100) compared to recommended supplier (${topEv.finalScore}/100).`);
         }
       }
 
@@ -305,7 +280,7 @@ export function evaluateItemVendorRecommendations(
   });
 }
 
-/** Compute Metric 6: Global Vendor Trust / Loyalty (7%) across all historical POs */
+/** Compute Metric 5: Supplier Trust / Loyalty (32%) across all historical POs */
 function computeGlobalTrustScores(records: HistoricalRecord[]): Record<string, number> {
   const vendorStats: Record<
     string,
@@ -346,6 +321,7 @@ function computeGlobalTrustScores(records: HistoricalRecord[]): Record<string, n
     const poScore = (s.poCount / maxPOs) * 100;
     const spendScore = (s.totalSpend / maxSpend) * 100;
 
+    // Trust Score = 40% Years Working + 30% PO Count + 30% Total PO Amount
     trustScores[vName] = Math.round(0.4 * yearsScore + 0.3 * poScore + 0.3 * spendScore);
   });
 
