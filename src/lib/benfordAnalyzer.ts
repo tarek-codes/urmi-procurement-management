@@ -31,6 +31,7 @@ export interface NumberItem {
   amount: number;
   label: string;
   context: string;
+  procurer?: string;
 }
 
 /** Analyze an array of financial numbers against Benford's Law */

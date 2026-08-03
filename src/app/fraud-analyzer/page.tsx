@@ -24,6 +24,7 @@ export default function FraudAnalyzerPage() {
   const [csFileName, setCsFileName] = useState<string | null>(null);
   const [histFileName, setHistFileName] = useState<string | null>(null);
   const [extractedNumbers, setExtractedNumbers] = useState<NumberItem[]>([]);
+  const [procurerFilter, setProcurerFilter] = useState<string>("ALL");
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,6 +32,7 @@ export default function FraudAnalyzerPage() {
   const processUploadedFile = async (file: File) => {
     setIsProcessing(true);
     setError(null);
+    setProcurerFilter("ALL");
     try {
       const buffer = await file.arrayBuffer();
       const items: NumberItem[] = [];
@@ -39,11 +41,13 @@ export default function FraudAnalyzerPage() {
       const records = parseHistoricalFile(buffer);
       if (records.length > 0) {
         records.forEach((r) => {
+          const proc = r.company || "Unknown";
           if (r.csAmount) {
             items.push({
               amount: r.csAmount,
               label: `CS Amount - ${r.csNo}`,
               context: `${r.company} (${r.supplierName})`,
+              procurer: proc,
             });
           }
           if (r.poAmount) {
@@ -51,6 +55,7 @@ export default function FraudAnalyzerPage() {
               amount: r.poAmount,
               label: `PO Amount - ${r.poNo || "N/A"}`,
               context: `${r.company} (${r.supplierName})`,
+              procurer: proc,
             });
           }
           if (r.billAmount) {
@@ -58,6 +63,7 @@ export default function FraudAnalyzerPage() {
               amount: r.billAmount,
               label: `Bill Amount - ${r.billNo || "N/A"}`,
               context: `${r.company} (${r.supplierName})`,
+              procurer: proc,
             });
           }
           if (r.csRate) {
@@ -65,6 +71,7 @@ export default function FraudAnalyzerPage() {
               amount: r.csRate,
               label: `CS Rate - ${r.itemName}`,
               context: `${r.company} (${r.supplierName})`,
+              procurer: proc,
             });
           }
           if (r.poRate) {
@@ -72,6 +79,7 @@ export default function FraudAnalyzerPage() {
               amount: r.poRate,
               label: `PO Rate - ${r.itemName}`,
               context: `${r.company} (${r.supplierName})`,
+              procurer: proc,
             });
           }
         });
@@ -89,11 +97,13 @@ export default function FraudAnalyzerPage() {
       const docs = parseExcelFile(buffer);
       if (docs.length > 0) {
         docs.forEach((doc) => {
+          const proc = doc.procurers.join(", ") || doc.companyName || "Unknown";
           if (doc.csMainValue) {
             items.push({
               amount: doc.csMainValue,
               label: `${doc.csNo} - Main Value`,
               context: `${doc.companyName} (${doc.procurers.join(", ")})`,
+              procurer: proc,
             });
           }
           doc.items.forEach((it) => {
@@ -103,6 +113,7 @@ export default function FraudAnalyzerPage() {
                   amount: q.unitRate,
                   label: `${doc.csNo} - ${it.itemName} (${q.supplierName})`,
                   context: `Unit Rate: $${q.unitRate}`,
+                  procurer: proc,
                 });
               }
               if (q.totalPrice) {
@@ -110,6 +121,7 @@ export default function FraudAnalyzerPage() {
                   amount: q.totalPrice,
                   label: `${doc.csNo} - ${it.itemName} (${q.supplierName})`,
                   context: `Total Price: $${q.totalPrice}`,
+                  procurer: proc,
                 });
               }
             });
@@ -132,6 +144,7 @@ export default function FraudAnalyzerPage() {
         const rawJson: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
         
         rawJson.forEach((row, rowIdx) => {
+          const proc = String(row["PROCURER"] || row["COMPANY"] || row["Company"] || "Unknown").trim();
           Object.entries(row).forEach(([colKey, val]) => {
             let num = 0;
             if (typeof val === "number") num = val;
@@ -139,13 +152,13 @@ export default function FraudAnalyzerPage() {
               const cleaned = val.replace(/,/g, "").trim();
               num = parseFloat(cleaned);
             }
-            // Ignore non-positive numbers or index/SL NO columns (e.g. 1..35000 row indices)
             const isSlNo = colKey.toUpperCase().includes("SL") || colKey.toUpperCase().includes("INDEX");
             if (!isNaN(num) && num > 0 && !isSlNo) {
               items.push({
                 amount: num,
                 label: `Row ${rowIdx + 1} - ${colKey}`,
                 context: `${colKey}: ${num}`,
+                procurer: proc,
               });
             }
           });
@@ -175,6 +188,7 @@ export default function FraudAnalyzerPage() {
   const loadStoredDbBenford = async () => {
     setIsProcessing(true);
     setError(null);
+    setProcurerFilter("ALL");
     try {
       const res = await fetch("/api/historical-db", {
         headers: { "ngrok-skip-browser-warning": "true" },
@@ -185,11 +199,13 @@ export default function FraudAnalyzerPage() {
 
       const items: NumberItem[] = [];
       records.forEach((r) => {
+        const proc = r.company || "Unknown";
         if (r.csAmount) {
           items.push({
             amount: r.csAmount,
             label: `CS Amount - ${r.csNo}`,
             context: `${r.company} (${r.supplierName})`,
+            procurer: proc,
           });
         }
         if (r.poAmount) {
@@ -197,6 +213,7 @@ export default function FraudAnalyzerPage() {
             amount: r.poAmount,
             label: `PO Amount - ${r.poNo}`,
             context: `${r.company} (${r.supplierName})`,
+            procurer: proc,
           });
         }
         if (r.billAmount) {
@@ -204,6 +221,7 @@ export default function FraudAnalyzerPage() {
             amount: r.billAmount,
             label: `Bill Amount - ${r.billNo}`,
             context: `${r.company} (${r.supplierName})`,
+            procurer: proc,
           });
         }
       });
@@ -218,11 +236,23 @@ export default function FraudAnalyzerPage() {
     }
   };
 
-  // Run Benford Analysis
-  const benfordResult: BenfordAnalysisResult | null = useMemo(() => {
-    if (extractedNumbers.length === 0) return null;
-    return analyzeBenfordLaw(extractedNumbers);
+  // List of unique procurers/companies in dataset
+  const procurerOptions = useMemo(() => {
+    const set = new Set(extractedNumbers.map((i) => i.procurer).filter(Boolean));
+    return Array.from(set).sort();
   }, [extractedNumbers]);
+
+  // Filtered numbers by selected procurer
+  const filteredNumbers = useMemo(() => {
+    if (procurerFilter === "ALL") return extractedNumbers;
+    return extractedNumbers.filter((i) => i.procurer === procurerFilter);
+  }, [extractedNumbers, procurerFilter]);
+
+  // Run Benford Analysis on filtered dataset
+  const benfordResult: BenfordAnalysisResult | null = useMemo(() => {
+    if (filteredNumbers.length === 0) return null;
+    return analyzeBenfordLaw(filteredNumbers);
+  }, [filteredNumbers]);
 
   // Chart Data
   const chartData = useMemo(() => {
@@ -339,17 +369,42 @@ export default function FraudAnalyzerPage() {
       {/* Results View */}
       {benfordResult && (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-xl)" }}>
-          {/* File Bar */}
-          <div className="file-info-bar">
-            <div className="file-info-left">
-              🛡️ Audited File: <strong>{csFileName || histFileName}</strong> ({benfordResult.totalNumbersAnalyzed} financial numbers analyzed)
+          {/* File Bar & Procurer Filter */}
+          <div className="file-info-bar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+            <div className="file-info-left" style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+              <span>
+                🛡️ Audited File: <strong>{csFileName || histFileName}</strong> ({benfordResult.totalNumbersAnalyzed.toLocaleString()} figures)
+              </span>
+
+              {procurerOptions.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "var(--bg-subtle)", padding: "4px 10px", borderRadius: "6px", border: "1px solid var(--border)" }}>
+                  <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)" }}>
+                    Filter by Procurer / Company:
+                  </label>
+                  <select
+                    className="filter-select"
+                    value={procurerFilter}
+                    onChange={(e) => setProcurerFilter(e.target.value)}
+                    style={{ padding: "3px 8px", fontSize: "12px" }}
+                  >
+                    <option value="ALL">All Procurers & Companies ({extractedNumbers.length.toLocaleString()})</option>
+                    {procurerOptions.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
+
             <button
               className="btn-clear"
               onClick={() => {
                 setExtractedNumbers([]);
                 setCsFileName(null);
                 setHistFileName(null);
+                setProcurerFilter("ALL");
               }}
             >
               Audit Another File
