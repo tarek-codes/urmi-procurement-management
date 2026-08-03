@@ -109,10 +109,10 @@ export default function CSDetailView({ report, onBack }: Props) {
             <thead>
               <tr>
                 <th style={{ width: "40px" }}>#</th>
-                <th style={{ width: "260px" }}>Item Details</th>
-                <th>Supplier Quotations (Unit Rate & Total)</th>
+                <th style={{ width: "240px" }}>Item Details</th>
+                <th>Quoted Supplier Prices (All Competitor Rates)</th>
                 <th style={{ textAlign: "right", width: "120px" }}>CS Value</th>
-                <th style={{ width: "90px" }}>Status</th>
+                <th style={{ width: "100px" }}>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -136,7 +136,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                           fontSize: 11,
                           color: "var(--text-tertiary)",
                           marginTop: 2,
-                          maxWidth: 240,
+                          maxWidth: 220,
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
@@ -147,39 +147,70 @@ export default function CSDetailView({ report, onBack }: Props) {
                       </div>
                     </td>
                     <td>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "8px" }}>
                         {item.quotations.map((q) => {
                           const isSelected = item.selectedSupplier?.supplierName === q.supplierName;
                           const isLowest = item.minQuotation?.supplierName === q.supplierName;
 
-                          let badgeClass = "supplier-quote-badge";
-                          if (isSelected) {
-                            badgeClass += isLowest ? " selected-min" : " selected-override";
+                          let badgeStyle: React.CSSProperties = {
+                            padding: "8px 12px",
+                            borderRadius: "6px",
+                            border: "1px solid var(--border)",
+                            background: "var(--bg-subtle)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "4px",
+                          };
+
+                          if (isSelected && isLowest) {
+                            badgeStyle = {
+                              ...badgeStyle,
+                              background: "#f0fdf4",
+                              borderColor: "#16a34a",
+                              boxShadow: "0 1px 2px rgba(22, 163, 74, 0.1)",
+                            };
+                          } else if (isSelected && !isLowest) {
+                            badgeStyle = {
+                              ...badgeStyle,
+                              background: "#fef2f2",
+                              borderColor: "#dc2626",
+                              boxShadow: "0 1px 2px rgba(220, 38, 38, 0.1)",
+                            };
                           } else if (isLowest) {
-                            badgeClass += " min";
+                            badgeStyle = {
+                              ...badgeStyle,
+                              background: "#eff6ff",
+                              borderColor: "#2563eb",
+                            };
                           }
 
                           return (
-                            <div key={q.supplierName} className={badgeClass}>
-                              <div className="sq-name-row">
-                                <span className="sq-name" title={q.supplierName}>
+                            <div key={q.supplierName} style={badgeStyle}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "4px" }}>
+                                <span style={{ fontWeight: 700, fontSize: "12px", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px" }} title={q.supplierName}>
                                   {q.supplierName}
                                 </span>
                                 {isSelected && (
-                                  <span className={`sq-tag ${isLowest ? "selected-tag" : "override-tag"}`}>
-                                    {isLowest ? "Selected" : "Selected (Higher)"}
+                                  <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", background: isLowest ? "#16a34a" : "#dc2626", color: "#ffffff" }}>
+                                    {isLowest ? "Selected L1" : "Selected (Higher)"}
                                   </span>
                                 )}
-                                {isLowest && !isSelected && <span className="sq-tag lowest-tag">Lowest</span>}
+                                {isLowest && !isSelected && (
+                                  <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", background: "#2563eb", color: "#ffffff" }}>
+                                    Lowest L1
+                                  </span>
+                                )}
                               </div>
-                              <div className="sq-price-row">
-                                <span className="sq-rate">
-                                  ${q.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                                  <span className="sq-qty"> × {q.quantity}</span>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "12px", marginTop: "2px" }}>
+                                <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+                                  Rate: ${q.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                                 </span>
-                                <span className="sq-total">
-                                  Total: ${q.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                                  Qty: {q.quantity}
                                 </span>
+                              </div>
+                              <div style={{ fontSize: "11px", fontWeight: 700, color: isSelected ? (isLowest ? "#15803d" : "#b91c1c") : "var(--text-secondary)", borderTop: "1px dashed var(--border)", paddingTop: "4px", marginTop: "2px" }}>
+                                Total: ${q.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                               </div>
                             </div>
                           );
@@ -189,9 +220,9 @@ export default function CSDetailView({ report, onBack }: Props) {
                     <td
                       style={{
                         textAlign: "right",
-                        fontWeight: 600,
+                        fontWeight: 700,
                         fontVariantNumeric: "tabular-nums",
-                        fontSize: "13px",
+                        fontSize: "14px",
                         color: isMinSelected ? "var(--text-primary)" : "var(--error)",
                       }}
                     >
@@ -203,7 +234,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                       {isMinSelected ? (
                         <span className="status-badge passed">
                           <span className="status-dot"></span>
-                          Valid
+                          Optimal L1
                         </span>
                       ) : (
                         <span className="status-badge failed" title="Selected supplier is higher than the minimum quote">
