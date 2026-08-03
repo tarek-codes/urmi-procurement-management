@@ -35,13 +35,10 @@ export function validateAllCS(documents: CSDocument[]): CSValidationReport[] {
     results.push(rule4_supplierValidation(doc));
     results.push(rule5_minSupplierCount(doc));
     results.push(rule6_itemCoverage(doc));
-    results.push(rule7_selectedSupplier(doc));
     results.push(rule8_supplierQuotationCoverage(doc));
-    results.push(rule9_csTotalValidation(doc));
     results.push(rule10_currencyValidation(doc));
     results.push(rule11_approvalValidation(doc));
     results.push(rule13_singleProcurer(doc));
-    results.push(rule14_minValueSelection(doc));
 
     // Rule 15 — Aggregation: if any item-level rule failed, CS fails
     const errorCount = results.filter(

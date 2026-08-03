@@ -90,16 +90,12 @@ export default function CSDetailView({ report, onBack }: Props) {
               <line x1="3" y1="9" x2="21" y2="9" />
               <line x1="9" y1="21" x2="9" y2="9" />
             </svg>
-            Items & Quoted Prices ({report.items.length})
+            Itemwise Supplier Price Comparison & Recommendations ({report.items.length} Items)
           </div>
           <div style={{ display: "flex", gap: "12px", fontSize: "11px", fontWeight: 500 }}>
             <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-              <span className="supplier-tag selected" style={{ margin: 0 }}>Selected</span>
-              <span style={{ color: "var(--text-tertiary)" }}>(Awarded)</span>
-            </span>
-            <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-              <span className="supplier-tag min" style={{ margin: 0 }}>Lowest</span>
-              <span style={{ color: "var(--text-tertiary)" }}>(Min Quote)</span>
+              <span style={{ background: "#16a34a", color: "white", padding: "2px 8px", borderRadius: "4px", fontWeight: 700 }}>Recommended L1</span>
+              <span style={{ color: "var(--text-tertiary)" }}>(Lowest Price Supplier)</span>
             </span>
           </div>
         </div>
@@ -110,17 +106,14 @@ export default function CSDetailView({ report, onBack }: Props) {
               <tr>
                 <th style={{ width: "40px" }}>#</th>
                 <th style={{ width: "240px" }}>Item Details</th>
-                <th>Quoted Supplier Prices (All Competitor Rates)</th>
-                <th style={{ textAlign: "right", width: "120px" }}>CS Value</th>
-                <th style={{ width: "100px" }}>Status</th>
+                <th>Supplier Bids (Unit Rates & Totals)</th>
+                <th style={{ width: "220px" }}>Recommended Supplier</th>
+                <th style={{ textAlign: "right", width: "130px" }}>Lowest Total</th>
               </tr>
             </thead>
             <tbody>
               {report.items.map((item) => {
-                const isMinSelected =
-                  item.selectedSupplier &&
-                  item.minQuotation &&
-                  item.selectedSupplier.unitRate <= item.minQuotation.unitRate;
+                const rec = item.minQuotation;
 
                 return (
                   <tr key={item.slNo}>
@@ -143,14 +136,13 @@ export default function CSDetailView({ report, onBack }: Props) {
                         }}
                         title={item.technicalSpecification}
                       >
-                        {item.technicalSpecification}
+                        {item.technicalSpecification || "N/A"}
                       </div>
                     </td>
                     <td>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "8px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: "8px" }}>
                         {item.quotations.map((q) => {
-                          const isSelected = item.selectedSupplier?.supplierName === q.supplierName;
-                          const isLowest = item.minQuotation?.supplierName === q.supplierName;
+                          const isLowest = rec?.supplierName === q.supplierName;
 
                           let badgeStyle: React.CSSProperties = {
                             padding: "8px 12px",
@@ -162,42 +154,24 @@ export default function CSDetailView({ report, onBack }: Props) {
                             gap: "4px",
                           };
 
-                          if (isSelected && isLowest) {
+                          if (isLowest) {
                             badgeStyle = {
                               ...badgeStyle,
                               background: "#f0fdf4",
                               borderColor: "#16a34a",
-                              boxShadow: "0 1px 2px rgba(22, 163, 74, 0.1)",
-                            };
-                          } else if (isSelected && !isLowest) {
-                            badgeStyle = {
-                              ...badgeStyle,
-                              background: "#fef2f2",
-                              borderColor: "#dc2626",
-                              boxShadow: "0 1px 2px rgba(220, 38, 38, 0.1)",
-                            };
-                          } else if (isLowest) {
-                            badgeStyle = {
-                              ...badgeStyle,
-                              background: "#eff6ff",
-                              borderColor: "#2563eb",
+                              boxShadow: "0 1px 3px rgba(22, 163, 74, 0.15)",
                             };
                           }
 
                           return (
                             <div key={q.supplierName} style={badgeStyle}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "4px" }}>
-                                <span style={{ fontWeight: 700, fontSize: "12px", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px" }} title={q.supplierName}>
+                                <span style={{ fontWeight: 700, fontSize: "12px", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "110px" }} title={q.supplierName}>
                                   {q.supplierName}
                                 </span>
-                                {isSelected && (
-                                  <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", background: isLowest ? "#16a34a" : "#dc2626", color: "#ffffff" }}>
-                                    {isLowest ? "Selected L1" : "Selected (Higher)"}
-                                  </span>
-                                )}
-                                {isLowest && !isSelected && (
-                                  <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", background: "#2563eb", color: "#ffffff" }}>
-                                    Lowest L1
+                                {isLowest && (
+                                  <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", background: "#16a34a", color: "#ffffff" }}>
+                                    ✓ Lowest
                                   </span>
                                 )}
                               </div>
@@ -209,7 +183,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                                   Qty: {q.quantity}
                                 </span>
                               </div>
-                              <div style={{ fontSize: "11px", fontWeight: 700, color: isSelected ? (isLowest ? "#15803d" : "#b91c1c") : "var(--text-secondary)", borderTop: "1px dashed var(--border)", paddingTop: "4px", marginTop: "2px" }}>
+                              <div style={{ fontSize: "11px", fontWeight: 700, color: isLowest ? "#15803d" : "var(--text-secondary)", borderTop: "1px dashed var(--border)", paddingTop: "4px", marginTop: "2px" }}>
                                 Total: ${q.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                               </div>
                             </div>
@@ -217,31 +191,33 @@ export default function CSDetailView({ report, onBack }: Props) {
                         })}
                       </div>
                     </td>
+                    <td>
+                      {rec ? (
+                        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "8px 10px", borderRadius: "6px" }}>
+                          <div style={{ fontSize: "11px", color: "#166534", fontWeight: 600 }}>💡 Recommended:</div>
+                          <div style={{ fontSize: "13px", fontWeight: 700, color: "#15803d", marginTop: "2px" }}>
+                            {rec.supplierName}
+                          </div>
+                          <div style={{ fontSize: "11px", color: "#166534", marginTop: "2px" }}>
+                            ${rec.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} / unit
+                          </div>
+                        </div>
+                      ) : (
+                        <span style={{ color: "var(--text-tertiary)", fontSize: "12px" }}>No quotes available</span>
+                      )}
+                    </td>
                     <td
                       style={{
                         textAlign: "right",
                         fontWeight: 700,
                         fontVariantNumeric: "tabular-nums",
                         fontSize: "14px",
-                        color: isMinSelected ? "var(--text-primary)" : "var(--error)",
+                        color: "#15803d",
                       }}
                     >
-                      ${item.csMainValue.toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                      })}
-                    </td>
-                    <td>
-                      {isMinSelected ? (
-                        <span className="status-badge passed">
-                          <span className="status-dot"></span>
-                          Optimal L1
-                        </span>
-                      ) : (
-                        <span className="status-badge failed" title="Selected supplier is higher than the minimum quote">
-                          <span className="status-dot"></span>
-                          Override
-                        </span>
-                      )}
+                      {rec
+                        ? `$${rec.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                        : "—"}
                     </td>
                   </tr>
                 );
