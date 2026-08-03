@@ -33,7 +33,6 @@ export function validateAllCS(documents: CSDocument[]): CSValidationReport[] {
     results.push(rule2_csNumberValidation(doc, allCSNumbers));
     results.push(rule3_requisitionValidation(doc));
     results.push(rule4_supplierValidation(doc));
-    results.push(rule5_minSupplierCount(doc));
     results.push(rule6_itemCoverage(doc));
     results.push(rule8_supplierQuotationCoverage(doc));
     results.push(rule10_currencyValidation(doc));
