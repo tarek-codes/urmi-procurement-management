@@ -43,50 +43,66 @@ export function parseHistoricalFile(buffer: ArrayBuffer): HistoricalRecord[] {
     defval: "",
   });
 
-  return rawRows.map((row) => ({
-    slNo: parseNum(row["SL No"] || row["SL_NO"]),
-    company: String(row["COMPANY"] || "").trim(),
-    itemId: parseNum(row["ITEM_ID"]),
-    itemName: String(row["ITEM_NAME"] || "").trim(),
-    tsId: parseNum(row["TS_ID"]),
-    tsName: String(row["TS_NAME"] || "").trim(),
-    reqQty: parseNum(row["REQ_QTY"]),
-    reqUnit: String(row["REQ_UNIT"] || "").trim(),
-    csQty: parseNum(row["CS_QTY"]),
-    csUnit: String(row["CS_UNIT"] || "").trim(),
-    csRate: parseNum(row["CS_RATE"]),
-    poQty: parseNum(row["PO_QTY"]),
-    poUnit: String(row["PO_UNIT"] || "").trim(),
-    poRate: parseNum(row["PO_RATE"]),
-    grnQty: parseNum(row["GRN_QTY"]),
-    grnUnit: String(row["GRN_UNIT"] || "").trim(),
-    billQty: parseNum(row["BILL_QTY"]),
-    billUnit: String(row["BILL_UNIT"] || "").trim(),
-    billRate: parseNum(row["BILL_RATE"]),
-    category: String(row["CATAGORY"] || row["CATEGORY"] || "").trim(),
-    subCategory: String(row["SUB_CATAGORY"] || row["SUB_CATEGORY"] || "").trim(),
-    supplierName: String(row["SUPPLIER_NAME"] || "").trim(),
-    reqNo: String(row["REQ_NO"] || "").trim(),
-    reqDate: formatDate(row["REQ_DATE"]),
-    csNo: String(row["CS_NO"] || "").trim(),
-    csTsId: parseNum(row["CS_TS_ID"]),
-    csTs: String(row["CS_TS"] || "").trim(),
-    csAmount: parseNum(row["CS_AMOUNT"]),
-    poNo: String(row["PO_NO"] || "").trim(),
-    poDate: formatDate(row["PO_DATE"]),
-    poAmount: parseNum(row["PO_AMOUNT"]),
-    grnNo: String(row["GRN_NO"] || "").trim(),
-    grnDate: formatDate(row["GRN_DATE"]),
-    challanNo: String(row["CHALLAN_NO"] || "").trim(),
-    challanDate: formatDate(row["CHALLAN_DATE"]),
-    grnAmount: parseNum(row["GRN_AMOUNT"]),
-    billNo: String(row["BILL_NO"] || "").trim(),
-    billDate: formatDate(row["BILL_DATE"]),
-    billAmount: parseNum(row["BILL_AMOUNT"]),
-    qtyAnomalyFlag: String(row["QTY_ANOMALY_FLAG"] || "").trim(),
-    priceAnomalyFlag: String(row["PRICE_ANOMALY_FLAG"] || "").trim(),
-    overallAnomalyFlag: String(row["OVERALL_ANOMALY_FLAG"] || "").trim(),
-  }));
+  return rawRows.map((row) => {
+    // Normalise column keys (trim whitespace, replace spaces with underscores, uppercase)
+    const norm: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(row)) {
+      const normKey = k.trim().replace(/\s+/g, "_").toUpperCase();
+      norm[normKey] = v;
+    }
+
+    const getVal = (...keys: string[]) => {
+      for (const key of keys) {
+        if (norm[key] !== undefined && norm[key] !== "") return norm[key];
+      }
+      return "";
+    };
+
+    return {
+      slNo: parseNum(getVal("SL_NO", "SLNO", "SL_NUMBER", "SL")),
+      company: String(getVal("COMPANY", "COMPANY_NAME", "COMP")).trim(),
+      itemId: parseNum(getVal("ITEM_ID")),
+      itemName: String(getVal("ITEM_NAME", "ITEM")).trim(),
+      tsId: parseNum(getVal("TS_ID")),
+      tsName: String(getVal("TS_NAME", "TS")),
+      reqQty: parseNum(getVal("REQ_QTY", "REQUISITION_QTY")),
+      reqUnit: String(getVal("REQ_UNIT")).trim(),
+      csQty: parseNum(getVal("CS_QTY")),
+      csUnit: String(getVal("CS_UNIT")).trim(),
+      csRate: parseNum(getVal("CS_RATE", "CS_PRICE", "CS_UNIT_RATE")),
+      poQty: parseNum(getVal("PO_QTY")),
+      poUnit: String(getVal("PO_UNIT")).trim(),
+      poRate: parseNum(getVal("PO_RATE", "PO_PRICE", "PO_UNIT_RATE")),
+      grnQty: parseNum(getVal("GRN_QTY")),
+      grnUnit: String(getVal("GRN_UNIT")).trim(),
+      billQty: parseNum(getVal("BILL_QTY")),
+      billUnit: String(getVal("BILL_UNIT")).trim(),
+      billRate: parseNum(getVal("BILL_RATE", "BILL_PRICE")),
+      category: String(getVal("CATAGORY", "CATEGORY")).trim(),
+      subCategory: String(getVal("SUB_CATAGORY", "SUB_CATEGORY")).trim(),
+      supplierName: String(getVal("SUPPLIER_NAME", "SUPPLIER", "VENDOR")).trim(),
+      reqNo: String(getVal("REQ_NO", "REQUISITION_NO")).trim(),
+      reqDate: formatDate(getVal("REQ_DATE")),
+      csNo: String(getVal("CS_NO", "CS_NUMBER")).trim(),
+      csTsId: parseNum(getVal("CS_TS_ID")),
+      csTs: String(getVal("CS_TS")).trim(),
+      csAmount: parseNum(getVal("CS_AMOUNT", "CS_VALUE", "CS_TOTAL")),
+      poNo: String(getVal("PO_NO", "PO_NUMBER")).trim(),
+      poDate: formatDate(getVal("PO_DATE")),
+      poAmount: parseNum(getVal("PO_AMOUNT", "PO_VALUE", "PO_TOTAL")),
+      grnNo: String(getVal("GRN_NO", "GRN_NUMBER")).trim(),
+      grnDate: formatDate(getVal("GRN_DATE")),
+      challanNo: String(getVal("CHALLAN_NO")).trim(),
+      challanDate: formatDate(getVal("CHALLAN_DATE")),
+      grnAmount: parseNum(getVal("GRN_AMOUNT")),
+      billNo: String(getVal("BILL_NO", "BILL_NUMBER", "INVOICE_NO")).trim(),
+      billDate: formatDate(getVal("BILL_DATE")),
+      billAmount: parseNum(getVal("BILL_AMOUNT", "BILL_VALUE")),
+      qtyAnomalyFlag: String(getVal("QTY_ANOMALY_FLAG")).trim(),
+      priceAnomalyFlag: String(getVal("PRICE_ANOMALY_FLAG")).trim(),
+      overallAnomalyFlag: String(getVal("OVERALL_ANOMALY_FLAG")).trim(),
+    };
+  });
 }
 
 function formatDate(val: unknown): string {

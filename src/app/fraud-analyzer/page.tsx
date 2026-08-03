@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
+import * as XLSX from "xlsx";
 import { parseExcelFile } from "@/lib/excelParser";
 import { parseHistoricalFile } from "@/lib/historicalParser";
 import { analyzeBenfordLaw, NumberItem } from "@/lib/benfordAnalyzer";
@@ -26,99 +27,145 @@ export default function FraudAnalyzerPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Handle CS Excel Upload
-  const handleCsUpload = async (file: File) => {
+  // Unified File Audit Handler (Supports CS Excel, Item Cycle Report, and 35k+ historical rows)
+  const processUploadedFile = async (file: File) => {
     setIsProcessing(true);
     setError(null);
     try {
       const buffer = await file.arrayBuffer();
-      const docs = parseExcelFile(buffer);
-      if (docs.length === 0) {
-        throw new Error("No Comparative Statement records found.");
+      const items: NumberItem[] = [];
+
+      // 1. Try Historical Item Cycle Parser
+      const records = parseHistoricalFile(buffer);
+      if (records.length > 0) {
+        records.forEach((r) => {
+          if (r.csAmount) {
+            items.push({
+              amount: r.csAmount,
+              label: `CS Amount - ${r.csNo}`,
+              context: `${r.company} (${r.supplierName})`,
+            });
+          }
+          if (r.poAmount) {
+            items.push({
+              amount: r.poAmount,
+              label: `PO Amount - ${r.poNo || "N/A"}`,
+              context: `${r.company} (${r.supplierName})`,
+            });
+          }
+          if (r.billAmount) {
+            items.push({
+              amount: r.billAmount,
+              label: `Bill Amount - ${r.billNo || "N/A"}`,
+              context: `${r.company} (${r.supplierName})`,
+            });
+          }
+          if (r.csRate) {
+            items.push({
+              amount: r.csRate,
+              label: `CS Rate - ${r.itemName}`,
+              context: `${r.company} (${r.supplierName})`,
+            });
+          }
+          if (r.poRate) {
+            items.push({
+              amount: r.poRate,
+              label: `PO Rate - ${r.itemName}`,
+              context: `${r.company} (${r.supplierName})`,
+            });
+          }
+        });
+
+        if (items.length > 0) {
+          setExtractedNumbers(items);
+          setHistFileName(file.name);
+          setCsFileName(null);
+          setIsProcessing(false);
+          return;
+        }
       }
 
-      const items: NumberItem[] = [];
-      docs.forEach((doc) => {
-        if (doc.csMainValue) {
-          items.push({
-            amount: doc.csMainValue,
-            label: `${doc.csNo} - Main Value`,
-            context: `${doc.companyName} (${doc.procurers.join(", ")})`,
+      // 2. Try CS Excel Parser
+      const docs = parseExcelFile(buffer);
+      if (docs.length > 0) {
+        docs.forEach((doc) => {
+          if (doc.csMainValue) {
+            items.push({
+              amount: doc.csMainValue,
+              label: `${doc.csNo} - Main Value`,
+              context: `${doc.companyName} (${doc.procurers.join(", ")})`,
+            });
+          }
+          doc.items.forEach((it) => {
+            it.quotations.forEach((q) => {
+              if (q.unitRate) {
+                items.push({
+                  amount: q.unitRate,
+                  label: `${doc.csNo} - ${it.itemName} (${q.supplierName})`,
+                  context: `Unit Rate: $${q.unitRate}`,
+                });
+              }
+              if (q.totalPrice) {
+                items.push({
+                  amount: q.totalPrice,
+                  label: `${doc.csNo} - ${it.itemName} (${q.supplierName})`,
+                  context: `Total Price: $${q.totalPrice}`,
+                });
+              }
+            });
           });
+        });
+
+        if (items.length > 0) {
+          setExtractedNumbers(items);
+          setCsFileName(file.name);
+          setHistFileName(null);
+          setIsProcessing(false);
+          return;
         }
-        doc.items.forEach((it) => {
-          it.quotations.forEach((q) => {
-            if (q.unitRate) {
-              items.push({
-                amount: q.unitRate,
-                label: `${doc.csNo} - ${it.itemName} (${q.supplierName})`,
-                context: `Unit Rate: $${q.unitRate}`,
-              });
+      }
+
+      // 3. Robust Generic Fallback: Extract ANY numeric fields from all rows in the Excel sheet
+      const workbook = XLSX.read(buffer, { type: "array" });
+      for (const sName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sName];
+        const rawJson: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        
+        rawJson.forEach((row, rowIdx) => {
+          Object.entries(row).forEach(([colKey, val]) => {
+            let num = 0;
+            if (typeof val === "number") num = val;
+            else if (typeof val === "string") {
+              const cleaned = val.replace(/,/g, "").trim();
+              num = parseFloat(cleaned);
             }
-            if (q.totalPrice) {
+            // Ignore non-positive numbers or index/SL NO columns (e.g. 1..35000 row indices)
+            const isSlNo = colKey.toUpperCase().includes("SL") || colKey.toUpperCase().includes("INDEX");
+            if (!isNaN(num) && num > 0 && !isSlNo) {
               items.push({
-                amount: q.totalPrice,
-                label: `${doc.csNo} - ${it.itemName} (${q.supplierName})`,
-                context: `Total Price: $${q.totalPrice}`,
+                amount: num,
+                label: `Row ${rowIdx + 1} - ${colKey}`,
+                context: `${colKey}: ${num}`,
               });
             }
           });
         });
-      });
 
-      setExtractedNumbers(items);
-      setCsFileName(file.name);
-      setHistFileName(null);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Failed to parse CS file.");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // Handle Historical DB Upload
-  const handleHistUpload = async (file: File) => {
-    setIsProcessing(true);
-    setError(null);
-    try {
-      const buffer = await file.arrayBuffer();
-      const records = parseHistoricalFile(buffer);
-      if (records.length === 0) {
-        throw new Error("No historical records found.");
+        if (items.length > 0) break;
       }
 
-      const items: NumberItem[] = [];
-      records.forEach((r) => {
-        if (r.csAmount) {
-          items.push({
-            amount: r.csAmount,
-            label: `CS Amount - ${r.csNo}`,
-            context: `${r.company} (${r.supplierName})`,
-          });
-        }
-        if (r.poAmount) {
-          items.push({
-            amount: r.poAmount,
-            label: `PO Amount - ${r.poNo}`,
-            context: `${r.company} (${r.supplierName})`,
-          });
-        }
-        if (r.billAmount) {
-          items.push({
-            amount: r.billAmount,
-            label: `Bill Amount - ${r.billNo}`,
-            context: `${r.company} (${r.supplierName})`,
-          });
-        }
-      });
+      if (items.length > 0) {
+        setExtractedNumbers(items);
+        setHistFileName(file.name);
+        setCsFileName(null);
+        setIsProcessing(false);
+        return;
+      }
 
-      setExtractedNumbers(items);
-      setHistFileName(file.name);
-      setCsFileName(null);
+      throw new Error("No valid financial numbers found in the uploaded file.");
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Failed to parse Item Cycle Report.");
+      console.error("Upload error:", err);
+      setError(err.message || "Failed to parse uploaded Excel file.");
     } finally {
       setIsProcessing(false);
     }
@@ -129,7 +176,9 @@ export default function FraudAnalyzerPage() {
     setIsProcessing(true);
     setError(null);
     try {
-      const res = await fetch("/api/historical-db");
+      const res = await fetch("/api/historical-db", {
+        headers: { "ngrok-skip-browser-warning": "true" },
+      });
       if (!res.ok) throw new Error("Failed to fetch stored database.");
       const buffer = await res.arrayBuffer();
       const records = parseHistoricalFile(buffer);
@@ -248,7 +297,7 @@ export default function FraudAnalyzerPage() {
                 accept=".xlsx,.xls"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) handleCsUpload(f);
+                  if (f) processUploadedFile(f);
                 }}
                 style={{ display: "none" }}
               />
@@ -260,7 +309,7 @@ export default function FraudAnalyzerPage() {
                 accept=".xlsx,.xls"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) handleHistUpload(f);
+                  if (f) processUploadedFile(f);
                 }}
                 style={{ display: "none" }}
               />
@@ -331,20 +380,26 @@ export default function FraudAnalyzerPage() {
               {benfordResult.anomalyDescription}
             </p>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-md)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "var(--space-md)" }}>
+              <div style={{ background: "#ffffff", padding: "12px", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>MAD Statistic (Primary)</div>
+                <div style={{ fontSize: "20px", fontWeight: 700, color: benfordResult.madStat > 0.012 ? "var(--error)" : "var(--success)" }}>
+                  {benfordResult.madStat}
+                </div>
+              </div>
+              <div style={{ background: "#ffffff", padding: "12px", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>MAD Acceptable Limit</div>
+                <div style={{ fontSize: "20px", fontWeight: 700 }}>≤ 0.0120</div>
+              </div>
               <div style={{ background: "#ffffff", padding: "12px", borderRadius: "8px", border: "1px solid var(--border)" }}>
                 <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Chi-Square Statistic</div>
-                <div style={{ fontSize: "20px", fontWeight: 700, color: benfordResult.chiSquareStat > 15.51 ? "var(--error)" : "var(--text-primary)" }}>
+                <div style={{ fontSize: "20px", fontWeight: 700, color: benfordResult.chiSquareStat > 15.51 ? "var(--warning)" : "var(--text-primary)" }}>
                   {benfordResult.chiSquareStat}
                 </div>
               </div>
               <div style={{ background: "#ffffff", padding: "12px", borderRadius: "8px", border: "1px solid var(--border)" }}>
-                <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Critical Boundary (df=8, α=0.05)</div>
-                <div style={{ fontSize: "20px", fontWeight: 700 }}>15.51</div>
-              </div>
-              <div style={{ background: "#ffffff", padding: "12px", borderRadius: "8px", border: "1px solid var(--border)" }}>
                 <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Total Data Sample</div>
-                <div style={{ fontSize: "20px", fontWeight: 700 }}>{benfordResult.totalNumbersAnalyzed} Figures</div>
+                <div style={{ fontSize: "20px", fontWeight: 700 }}>{benfordResult.totalNumbersAnalyzed.toLocaleString()} Figures</div>
               </div>
             </div>
           </div>

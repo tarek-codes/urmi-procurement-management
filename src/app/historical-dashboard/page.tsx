@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useHistorical } from "@/context/HistoricalContext";
+import PaginationControls from "@/components/PaginationControls";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -34,6 +35,18 @@ ChartJS.register(
 export default function HistoricalDashboardPage() {
   const { analytics, isLoading, error, loadCustomFile, resetToDefaultDB, records } = useHistorical();
   const [activeTab, setActiveTab] = useState<string>("overview");
+
+  // Pagination state for Raw Records table (35k+ rows support)
+  const [rawPage, setRawPage] = useState(1);
+  const [rawPageSize, setRawPageSize] = useState(50);
+
+  const paginatedRawRecords = React.useMemo(() => {
+    const start = (rawPage - 1) * rawPageSize;
+    return records.slice(start, start + rawPageSize);
+  }, [records, rawPage, rawPageSize]);
+
+  const rawTotalPages = Math.ceil(records.length / rawPageSize);
+
 
   if (isLoading) {
     return (
@@ -653,9 +666,9 @@ export default function HistoricalDashboardPage() {
       {activeTab === "raw" && (
         <div className="summary-card">
           <div className="section-title">
-            <span>Historical Database Records ({records.length})</span>
+            <span>Historical Database Records ({records.length.toLocaleString()})</span>
           </div>
-          <div className="table-wrapper" style={{ maxHeight: "600px", overflowY: "auto" }}>
+          <div className="table-wrapper">
             <table className="cs-table">
               <thead>
                 <tr>
@@ -672,7 +685,7 @@ export default function HistoricalDashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {records.map((r, i) => (
+                {paginatedRawRecords.map((r, i) => (
                   <tr key={i}>
                     <td>{r.slNo}</td>
                     <td>{r.company}</td>
@@ -698,6 +711,15 @@ export default function HistoricalDashboardPage() {
                 ))}
               </tbody>
             </table>
+            <PaginationControls
+              currentPage={rawPage}
+              totalPages={rawTotalPages}
+              pageSize={rawPageSize}
+              totalItems={records.length}
+              onPageChange={setRawPage}
+              onPageSizeChange={setRawPageSize}
+              pageSizeOptions={[25, 50, 100, 250, 500]}
+            />
           </div>
         </div>
       )}

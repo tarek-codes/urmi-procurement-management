@@ -11,6 +11,8 @@ export interface BenfordAnalysisResult {
   totalNumbersAnalyzed: number;
   chiSquareStat: number; // Chi-square goodness-of-fit
   criticalValue: number; // Critical value for d.f. 8 (15.51 at alpha=0.05)
+  madStat: number; // Mean Absolute Deviation (MAD)
+  madThreshold: number; // MAD critical threshold (0.012 for acceptable, 0.015 for non-conforming)
   conformityLevel: "High Conformity (Natural)" | "Acceptable Conformity" | "Marginal Conformity" | "Non-Conforming (Potential Forgery / Fraud Risk)";
   isPotentialForgery: boolean;
   anomalyDescription: string;

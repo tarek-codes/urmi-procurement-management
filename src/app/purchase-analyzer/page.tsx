@@ -1,5 +1,7 @@
 "use client";
 
+import PaginationControls from "@/components/PaginationControls";
+
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { parseExcelFile } from "@/lib/excelParser";
@@ -72,7 +74,9 @@ export default function FlopPurchaseAnalyzerPage() {
     setIsProcessing(true);
     setError(null);
     try {
-      const res = await fetch("/api/historical-db");
+      const res = await fetch("/api/historical-db", {
+        headers: { "ngrok-skip-browser-warning": "true" },
+      });
       if (!res.ok) throw new Error("Failed to fetch default Item Cycle Report.");
       const buffer = await res.arrayBuffer();
       const records = parseHistoricalFile(buffer);
@@ -126,11 +130,25 @@ export default function FlopPurchaseAnalyzerPage() {
         filterCompany === "ALL" || cs.companyName === filterCompany;
 
       const matchesProcurer =
-        filterProcurer === "ALL" || cs.procurer.includes(filterProcurer);
+        filterProcurer === "ALL" || cs.procurer === filterProcurer;
 
       return matchesSearch && matchesSeverity && matchesCompany && matchesProcurer;
     });
   }, [flopSummary, searchQuery, filterSeverity, filterCompany, filterProcurer]);
+
+  // Pagination for CS Table
+  const [csPage, setCsPage] = useState(1);
+  const [csPageSize, setCsPageSize] = useState(25);
+
+  React.useEffect(() => {
+    setCsPage(1);
+  }, [searchQuery, filterSeverity, filterCompany, filterProcurer]);
+
+  const totalCsPages = Math.ceil(filteredCsAnalyses.length / csPageSize);
+  const paginatedCsAnalyses = useMemo(() => {
+    const start = (csPage - 1) * csPageSize;
+    return filteredCsAnalyses.slice(start, start + csPageSize);
+  }, [filteredCsAnalyses, csPage, csPageSize]);
 
   const selectedCsAnalysis: FlopCSAnalysis | null = useMemo(() => {
     if (!flopSummary || !selectedCsNo) return null;
@@ -411,7 +429,7 @@ export default function FlopPurchaseAnalyzerPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCsAnalyses.map((cs) => (
+                  {paginatedCsAnalyses.map((cs) => (
                     <tr key={cs.csNo}>
                       <td style={{ fontWeight: 700, color: "var(--accent)" }}>{cs.csNo}</td>
                       <td>{cs.companyName}</td>
@@ -452,6 +470,15 @@ export default function FlopPurchaseAnalyzerPage() {
                   ))}
                 </tbody>
               </table>
+              <PaginationControls
+                currentPage={csPage}
+                totalPages={totalCsPages}
+                pageSize={csPageSize}
+                totalItems={filteredCsAnalyses.length}
+                onPageChange={setCsPage}
+                onPageSizeChange={setCsPageSize}
+                pageSizeOptions={[10, 25, 50, 100]}
+              />
             </div>
           </div>
         </>

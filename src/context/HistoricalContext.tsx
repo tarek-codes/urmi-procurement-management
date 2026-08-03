@@ -26,20 +26,32 @@ export function HistoricalProvider({ children }: { children: React.ReactNode }) 
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/historical-db");
+      const res = await fetch("/api/historical-db", {
+        headers: { "ngrok-skip-browser-warning": "true" },
+      });
       if (!res.ok) {
         throw new Error("Failed to fetch default historical database.");
       }
       const buffer = await res.arrayBuffer();
-      const parsedRecords = parseHistoricalFile(buffer);
-      const computedAnalytics = computeHistoricalAnalytics(parsedRecords);
+      
+      // Defer heavy Excel parsing & 18 analytics calculations to allow UI to render
+      setTimeout(() => {
+        try {
+          const parsedRecords = parseHistoricalFile(buffer);
+          const computedAnalytics = computeHistoricalAnalytics(parsedRecords);
 
-      setRecords(parsedRecords);
-      setAnalytics(computedAnalytics);
+          setRecords(parsedRecords);
+          setAnalytics(computedAnalytics);
+        } catch (parseErr) {
+          console.error("Error parsing DB:", parseErr);
+          setError("Failed to parse historical database records.");
+        } finally {
+          setIsLoading(false);
+        }
+      }, 50);
     } catch (err) {
       console.error("Error loading default DB:", err);
       setError("Failed to load historical database.");
-    } finally {
       setIsLoading(false);
     }
   }, []);

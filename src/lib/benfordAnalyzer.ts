@@ -63,6 +63,7 @@ export function analyzeBenfordLaw(items: NumberItem[]): BenfordAnalysisResult {
   }
 
   let chiSquareSum = 0;
+  let absoluteDiffSum = 0;
   const digitStats: BenfordDigitStat[] = [];
   const anomalousDigits: number[] = [];
 
@@ -72,11 +73,17 @@ export function analyzeBenfordLaw(items: NumberItem[]): BenfordAnalysisResult {
     const obsPct = Math.round((obsCount / total) * 1000) / 10;
     const diffPct = Math.round((obsPct - expPct) * 10) / 10;
 
+    // Chi-Square component
     const expCount = total * (expPct / 100);
     if (expCount > 0) {
       const chiComponent = Math.pow(obsCount - expCount, 2) / expCount;
       chiSquareSum += chiComponent;
     }
+
+    // MAD component: sum of absolute proportion differences |P_obs - P_exp|
+    const pObs = obsCount / total;
+    const pExp = expPct / 100;
+    absoluteDiffSum += Math.abs(pObs - pExp);
 
     let digitStatus: "Normal" | "Caution" | "Anomalous" = "Normal";
     const absDiff = Math.abs(diffPct);
@@ -100,16 +107,21 @@ export function analyzeBenfordLaw(items: NumberItem[]): BenfordAnalysisResult {
   const chiSquareStat = Math.round(chiSquareSum * 100) / 100;
   const criticalValue = 15.51; // 8 degrees of freedom at alpha = 0.05
 
+  // Calculate Mean Absolute Deviation (MAD = sum(|P_obs - P_exp|) / 9)
+  const madStat = Math.round((absoluteDiffSum / 9) * 10000) / 10000;
+  const madThreshold = 0.012; // Standard Nigrini MAD threshold for acceptable conformity
+
+  // Nigrini (2012) MAD Conformity Classification (sample-size independent)
   let conformityLevel: BenfordAnalysisResult["conformityLevel"] = "High Conformity (Natural)";
   let isPotentialForgery = false;
 
-  if (chiSquareStat <= 15.51) {
+  if (madStat <= 0.006) {
     conformityLevel = "High Conformity (Natural)";
     isPotentialForgery = false;
-  } else if (chiSquareStat <= 25.0) {
+  } else if (madStat <= 0.012) {
     conformityLevel = "Acceptable Conformity";
     isPotentialForgery = false;
-  } else if (chiSquareStat <= 35.0) {
+  } else if (madStat <= 0.015) {
     conformityLevel = "Marginal Conformity";
     isPotentialForgery = true;
   } else {
@@ -130,17 +142,19 @@ export function analyzeBenfordLaw(items: NumberItem[]): BenfordAnalysisResult {
 
   let description = "";
   if (isPotentialForgery) {
-    description = `Chi-Square test statistic (${chiSquareStat}) exceeds critical threshold (${criticalValue}). Significant deviation in leading digit frequencies (specifically digits ${anomalousDigits.join(
+    description = `Mean Absolute Deviation (MAD = ${madStat}) exceeds acceptable threshold (${madThreshold}). Significant deviation in leading digit distributions (specifically digits ${anomalousDigits.join(
       ", "
-    )}) indicates potential manual price manipulation, artificial rounding, or bidding collusion.`;
+    )}) indicates potential manual price rounding, non-random figures, or procurement bid collusion.`;
   } else {
-    description = `Chi-Square test statistic (${chiSquareStat}) falls within acceptable boundaries (${criticalValue}). Leading digit frequencies closely follow standard logarithmic Benford distributions, indicating naturally generated financial dataset.`;
+    description = `Mean Absolute Deviation (MAD = ${madStat}) falls within natural conformity threshold (${madThreshold}). Leading digit distribution closely follows standard logarithmic Benford probability, indicating an authentic, naturally generated dataset.`;
   }
 
   return {
     totalNumbersAnalyzed: total,
     chiSquareStat,
     criticalValue,
+    madStat,
+    madThreshold,
     conformityLevel,
     isPotentialForgery,
     anomalyDescription: description,
@@ -154,6 +168,8 @@ function createEmptyBenfordResult(): BenfordAnalysisResult {
     totalNumbersAnalyzed: 0,
     chiSquareStat: 0,
     criticalValue: 15.51,
+    madStat: 0,
+    madThreshold: 0.012,
     conformityLevel: "High Conformity (Natural)",
     isPotentialForgery: false,
     anomalyDescription: "No numeric data provided for analysis.",

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useValidation } from "@/context/ValidationContext";
+import PaginationControls from "./PaginationControls";
 
 type StatusFilter = "all" | "passed" | "failed";
 type SortField = "csDate" | "errorCount" | "warningCount" | "csNo";
@@ -23,6 +24,15 @@ export default function CSTable({ onSelectCS }: Props) {
   // Sort state
   const [sortField, setSortField] = useState<SortField>("csDate");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  // Reset page to 1 when filters or sort change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, companyFilter, procurerFilter, statusFilter, sortField, sortOrder]);
 
   // Extract unique companies and procurers for dropdown filters
   const uniqueCompanies = useMemo(() => {
@@ -103,6 +113,12 @@ export default function CSTable({ onSelectCS }: Props) {
     sortField,
     sortOrder,
   ]);
+
+  const totalPages = Math.ceil(filteredAndSortedReports.length / pageSize);
+  const paginatedReports = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredAndSortedReports.slice(start, start + pageSize);
+  }, [filteredAndSortedReports, currentPage, pageSize]);
 
   if (reports.length === 0) return null;
 
@@ -267,14 +283,14 @@ export default function CSTable({ onSelectCS }: Props) {
             </tr>
           </thead>
           <tbody>
-            {filteredAndSortedReports.length === 0 ? (
+            {paginatedReports.length === 0 ? (
               <tr>
                 <td colSpan={9} style={{ textAlign: "center", padding: "32px", color: "var(--text-tertiary)" }}>
                   No Comparative Statements match your current filters.
                 </td>
               </tr>
             ) : (
-              filteredAndSortedReports.map((report) => (
+              paginatedReports.map((report) => (
                 <tr
                   key={report.csId}
                   onClick={() => onSelectCS(report.csId)}
@@ -321,7 +337,17 @@ export default function CSTable({ onSelectCS }: Props) {
             )}
           </tbody>
         </table>
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          totalItems={filteredAndSortedReports.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          pageSizeOptions={[10, 25, 50, 100, 250]}
+        />
       </div>
     </div>
   );
 }
+
