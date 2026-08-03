@@ -155,14 +155,14 @@ export function evaluateItemVendorRecommendations(
       const experienceScore = Math.round((expCount / maxItemPOCount) * 1000) / 10;
 
       // Weighted Final Score:
-      // (30% Current Price) + (15% Win Rate) + (10% Delivery) + (8% Consistency) + (32% Trust) + (5% Experience) = 100%
+      // (30% Current Price) + (20% Trust) + (15% Consistency) + (15% Experience) + (10% Win Rate) + (10% Delivery) = 100%
       const finalScore = Math.round(
         (0.30 * currentPriceScore +
-          0.15 * winRateScore +
-          0.10 * deliveryScore +
-          0.08 * Math.max(0, consistencyScore) +
-          0.32 * trustScore +
-          0.05 * experienceScore) *
+          0.20 * trustScore +
+          0.15 * Math.max(0, consistencyScore) +
+          0.15 * experienceScore +
+          0.10 * winRateScore +
+          0.10 * deliveryScore) *
           100
       ) / 100;
 

@@ -343,24 +343,24 @@ export default function CSDetailView({ report, onBack }: Props) {
                       <div style={{ fontSize: "14px", fontWeight: 700 }}>{ev.metrics.currentPriceScore}/100</div>
                     </div>
                     <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
-                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Historical Win Rate (15%)</div>
+                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Supplier Trust & Loyalty (20%)</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700, color: "#15803d" }}>{ev.metrics.trustScore}/100</div>
+                    </div>
+                    <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Price Consistency (15%)</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700 }}>{ev.metrics.consistencyScore}/100</div>
+                    </div>
+                    <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Item Experience (15%)</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700 }}>{ev.metrics.experienceScore}/100</div>
+                    </div>
+                    <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Historical Win Rate (10%)</div>
                       <div style={{ fontSize: "14px", fontWeight: 700 }}>{ev.metrics.winRateScore}/100</div>
                     </div>
                     <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                       <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Delivery Speed (10%)</div>
                       <div style={{ fontSize: "14px", fontWeight: 700 }}>{ev.metrics.deliveryScore}/100</div>
-                    </div>
-                    <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
-                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Price Consistency (8%)</div>
-                      <div style={{ fontSize: "14px", fontWeight: 700 }}>{ev.metrics.consistencyScore}/100</div>
-                    </div>
-                    <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
-                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Supplier Trust & Loyalty (32%)</div>
-                      <div style={{ fontSize: "14px", fontWeight: 700, color: "#15803d" }}>{ev.metrics.trustScore}/100</div>
-                    </div>
-                    <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
-                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Item Experience (5%)</div>
-                      <div style={{ fontSize: "14px", fontWeight: 700 }}>{ev.metrics.experienceScore}/100</div>
                     </div>
                   </div>
 
