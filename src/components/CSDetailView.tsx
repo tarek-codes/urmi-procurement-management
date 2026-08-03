@@ -1,7 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { CSValidationReport, ValidationResult } from "@/lib/types";
+import { useHistorical } from "@/context/HistoricalContext";
+import {
+  evaluateItemVendorRecommendations,
+  ItemRecommendationResult,
+  VendorItemEvaluation,
+} from "@/lib/vendorScoringEngine";
 
 interface Props {
   report: CSValidationReport;
@@ -9,8 +15,22 @@ interface Props {
 }
 
 export default function CSDetailView({ report, onBack }: Props) {
+  const { records: historicalRecords } = useHistorical();
+  const [activeModalItem, setActiveModalItem] = useState<ItemRecommendationResult | null>(null);
+
   const failedRules = report.results.filter((r) => r.status === "failed");
   const passedRules = report.results.filter((r) => r.status === "passed");
+
+  // Compute 8-metric weighted recommendation engine results for all items in this CS
+  const itemRecommendations = useMemo(() => {
+    return evaluateItemVendorRecommendations(report.items, historicalRecords);
+  }, [report.items, historicalRecords]);
+
+  // Overall recommended total cost across all items
+  const totalRecommendedCost = itemRecommendations.reduce(
+    (sum, item) => sum + item.optimalTotalCost,
+    0
+  );
 
   return (
     <div className="detail-page">
@@ -61,13 +81,11 @@ export default function CSDetailView({ report, onBack }: Props) {
           </div>
         </div>
         <div className="detail-stats">
-          <div className="detail-stat errors">
-            <div className="detail-stat-value">{report.errorCount}</div>
-            <div className="detail-stat-label">Errors</div>
-          </div>
-          <div className="detail-stat warnings">
-            <div className="detail-stat-value">{report.warningCount}</div>
-            <div className="detail-stat-label">Warnings</div>
+          <div className="detail-stat" style={{ background: "#f0fdf4", borderColor: "#bbf7d0" }}>
+            <div className="detail-stat-value" style={{ color: "#15803d" }}>
+              ${totalRecommendedCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </div>
+            <div className="detail-stat-label" style={{ color: "#166534" }}>Recommended Total Cost</div>
           </div>
         </div>
       </div>
@@ -90,12 +108,12 @@ export default function CSDetailView({ report, onBack }: Props) {
               <line x1="3" y1="9" x2="21" y2="9" />
               <line x1="9" y1="21" x2="9" y2="9" />
             </svg>
-            Itemwise Supplier Price Comparison & Recommendations ({report.items.length} Items)
+            8-Metric Weighted Vendor Scoring & Itemwise Recommendations ({itemRecommendations.length} Items)
           </div>
           <div style={{ display: "flex", gap: "12px", fontSize: "11px", fontWeight: 500 }}>
             <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-              <span style={{ background: "#16a34a", color: "white", padding: "2px 8px", borderRadius: "4px", fontWeight: 700 }}>Recommended L1</span>
-              <span style={{ color: "var(--text-tertiary)" }}>(Lowest Price Supplier)</span>
+              <span style={{ background: "#16a34a", color: "white", padding: "2px 8px", borderRadius: "4px", fontWeight: 700 }}>Rank #1 Recommended</span>
+              <span style={{ color: "var(--text-tertiary)" }}>(Highest Composite Score)</span>
             </span>
           </div>
         </div>
@@ -105,44 +123,44 @@ export default function CSDetailView({ report, onBack }: Props) {
             <thead>
               <tr>
                 <th style={{ width: "40px" }}>#</th>
-                <th style={{ width: "240px" }}>Item Details</th>
-                <th>Supplier Bids (Unit Rates & Totals)</th>
-                <th style={{ width: "220px" }}>Recommended Supplier</th>
-                <th style={{ textAlign: "right", width: "130px" }}>Lowest Total</th>
+                <th style={{ width: "220px" }}>Item Details</th>
+                <th>Itemwise Vendor Bids & Composite Score</th>
+                <th style={{ width: "240px" }}>Recommended Vendor & Reasons</th>
+                <th style={{ textAlign: "center", width: "110px" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {report.items.map((item) => {
-                const rec = item.minQuotation;
+              {itemRecommendations.map((itemRec) => {
+                const rec = itemRec.recommendedVendor;
 
                 return (
-                  <tr key={item.slNo}>
+                  <tr key={itemRec.slNo}>
                     <td style={{ color: "var(--text-tertiary)", fontWeight: 500 }}>
-                      {item.slNo}
+                      {itemRec.slNo}
                     </td>
                     <td>
                       <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>
-                        {item.itemName}
+                        {itemRec.itemName}
                       </div>
                       <div
                         style={{
                           fontSize: 11,
                           color: "var(--text-tertiary)",
                           marginTop: 2,
-                          maxWidth: 220,
+                          maxWidth: 200,
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
                         }}
-                        title={item.technicalSpecification}
+                        title={itemRec.technicalSpecification}
                       >
-                        {item.technicalSpecification || "N/A"}
+                        {itemRec.technicalSpecification || "N/A"}
                       </div>
                     </td>
                     <td>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: "8px" }}>
-                        {item.quotations.map((q) => {
-                          const isLowest = rec?.supplierName === q.supplierName;
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: "8px" }}>
+                        {itemRec.evaluations.map((ev) => {
+                          const isRec = ev.isRecommended;
 
                           let badgeStyle: React.CSSProperties = {
                             padding: "8px 12px",
@@ -154,7 +172,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                             gap: "4px",
                           };
 
-                          if (isLowest) {
+                          if (isRec) {
                             badgeStyle = {
                               ...badgeStyle,
                               background: "#f0fdf4",
@@ -164,28 +182,31 @@ export default function CSDetailView({ report, onBack }: Props) {
                           }
 
                           return (
-                            <div key={q.supplierName} style={badgeStyle}>
+                            <div key={ev.vendorName} style={badgeStyle}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "4px" }}>
-                                <span style={{ fontWeight: 700, fontSize: "12px", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "110px" }} title={q.supplierName}>
-                                  {q.supplierName}
+                                <span style={{ fontWeight: 700, fontSize: "12px", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px" }} title={ev.vendorName}>
+                                  #{ev.rank} {ev.vendorName}
                                 </span>
-                                {isLowest && (
-                                  <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", background: "#16a34a", color: "#ffffff" }}>
-                                    ✓ Lowest
-                                  </span>
-                                )}
+                                <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", background: isRec ? "#16a34a" : "#64748b", color: "#ffffff" }}>
+                                  Score: {ev.finalScore}
+                                </span>
                               </div>
+
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "12px", marginTop: "2px" }}>
                                 <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
-                                  Rate: ${q.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                  Rate: ${ev.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                                 </span>
                                 <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                                  Qty: {q.quantity}
+                                  Total: ${ev.quotation?.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                                 </span>
                               </div>
-                              <div style={{ fontSize: "11px", fontWeight: 700, color: isLowest ? "#15803d" : "var(--text-secondary)", borderTop: "1px dashed var(--border)", paddingTop: "4px", marginTop: "2px" }}>
-                                Total: ${q.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                              </div>
+
+                              {/* Reasons why NOT selected for non-rank-1 vendors */}
+                              {!isRec && ev.reasonsAgainstSelection.length > 0 && (
+                                <div style={{ fontSize: "10px", color: "#b91c1c", background: "#fef2f2", padding: "4px 6px", borderRadius: "4px", border: "1px solid #fecaca", marginTop: "2px" }}>
+                                  ⚠️ <strong>Why not picked:</strong> {ev.reasonsAgainstSelection[0]}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -194,30 +215,40 @@ export default function CSDetailView({ report, onBack }: Props) {
                     <td>
                       {rec ? (
                         <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "8px 10px", borderRadius: "6px" }}>
-                          <div style={{ fontSize: "11px", color: "#166534", fontWeight: 600 }}>💡 Recommended:</div>
-                          <div style={{ fontSize: "13px", fontWeight: 700, color: "#15803d", marginTop: "2px" }}>
-                            {rec.supplierName}
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: "11px", color: "#166534", fontWeight: 700 }}>💡 Recommended Supplier:</span>
+                            <span style={{ fontSize: "10px", fontWeight: 700, background: "#16a34a", color: "white", padding: "1px 5px", borderRadius: "3px" }}>
+                              Score {rec.finalScore}/100
+                            </span>
                           </div>
-                          <div style={{ fontSize: "11px", color: "#166534", marginTop: "2px" }}>
-                            ${rec.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} / unit
+                          <div style={{ fontSize: "13px", fontWeight: 700, color: "#15803d", marginTop: "3px" }}>
+                            {rec.vendorName}
+                          </div>
+                          <div style={{ fontSize: "11px", color: "#166534", marginTop: "1px", fontWeight: 600 }}>
+                            ${rec.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} / unit (${rec.quotation?.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })} Total)
+                          </div>
+                          
+                          <div style={{ marginTop: "6px", fontSize: "10px", color: "#15803d", borderTop: "1px dashed #bbf7d0", paddingTop: "4px" }}>
+                            <strong>Key Reasons:</strong>
+                            <ul style={{ margin: "2px 0 0 12px", padding: 0 }}>
+                              {rec.reasonsForSelection.slice(0, 2).map((r, idx) => (
+                                <li key={idx}>{r}</li>
+                              ))}
+                            </ul>
                           </div>
                         </div>
                       ) : (
                         <span style={{ color: "var(--text-tertiary)", fontSize: "12px" }}>No quotes available</span>
                       )}
                     </td>
-                    <td
-                      style={{
-                        textAlign: "right",
-                        fontWeight: 700,
-                        fontVariantNumeric: "tabular-nums",
-                        fontSize: "14px",
-                        color: "#15803d",
-                      }}
-                    >
-                      {rec
-                        ? `$${rec.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
-                        : "—"}
+                    <td style={{ textAlign: "center" }}>
+                      <button
+                        className="btn-reset-filters"
+                        onClick={() => setActiveModalItem(itemRec)}
+                        style={{ padding: "4px 8px", fontSize: "11px", whiteSpace: "nowrap" }}
+                      >
+                        📊 View All 8 Metrics
+                      </button>
                     </td>
                   </tr>
                 );
@@ -226,6 +257,153 @@ export default function CSDetailView({ report, onBack }: Props) {
           </table>
         </div>
       </div>
+
+      {/* Modal / Drawer for 8-Metric Breakdown per Item */}
+      {activeModalItem && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(15, 23, 42, 0.6)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "20px",
+          }}
+          onClick={() => setActiveModalItem(null)}
+        >
+          <div
+            style={{
+              background: "#ffffff",
+              borderRadius: "12px",
+              maxWidth: "850px",
+              width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              padding: "24px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+              border: "1px solid var(--border)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+              <div>
+                <h3 style={{ fontSize: "18px", fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>
+                  8-Metric Vendor Evaluation: {activeModalItem.itemName}
+                </h3>
+                <p style={{ fontSize: "12px", color: "var(--text-secondary)", margin: "4px 0 0 0" }}>
+                  Item Specifications: {activeModalItem.technicalSpecification || "Standard Procurement Item"}
+                </p>
+              </div>
+              <button
+                className="clear-search-btn"
+                onClick={() => setActiveModalItem(null)}
+                style={{ fontSize: "18px" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {activeModalItem.evaluations.map((ev) => (
+                <div
+                  key={ev.vendorName}
+                  style={{
+                    border: ev.isRecommended ? "2px solid #16a34a" : "1px solid var(--border)",
+                    borderRadius: "8px",
+                    padding: "16px",
+                    background: ev.isRecommended ? "#f0fdf4" : "var(--bg-card)",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-primary)" }}>
+                        Rank #{ev.rank}: {ev.vendorName}
+                      </span>
+                      {ev.isRecommended && (
+                        <span style={{ background: "#16a34a", color: "white", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: 700 }}>
+                          💡 RECOMMENDED VENDOR
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: "16px", fontWeight: 800, color: ev.isRecommended ? "#15803d" : "var(--text-primary)" }}>
+                      Composite Score: {ev.finalScore} / 100
+                    </div>
+                  </div>
+
+                  {/* 8-Metric Scores Grid */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginBottom: "12px" }}>
+                    <div style={{ background: "#ffffff", padding: "6px 10px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Current Price (30%)</div>
+                      <div style={{ fontSize: "13px", fontWeight: 700 }}>{ev.metrics.currentPriceScore}/100</div>
+                    </div>
+                    <div style={{ background: "#ffffff", padding: "6px 10px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Hist Price (20%)</div>
+                      <div style={{ fontSize: "13px", fontWeight: 700 }}>{ev.metrics.historicalPriceScore}/100</div>
+                    </div>
+                    <div style={{ background: "#ffffff", padding: "6px 10px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Win Rate (15%)</div>
+                      <div style={{ fontSize: "13px", fontWeight: 700 }}>{ev.metrics.winRateScore}/100</div>
+                    </div>
+                    <div style={{ background: "#ffffff", padding: "6px 10px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Delivery (10%)</div>
+                      <div style={{ fontSize: "13px", fontWeight: 700 }}>{ev.metrics.deliveryScore}/100</div>
+                    </div>
+                    <div style={{ background: "#ffffff", padding: "6px 10px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Price Consistency (8%)</div>
+                      <div style={{ fontSize: "13px", fontWeight: 700 }}>{ev.metrics.consistencyScore}/100</div>
+                    </div>
+                    <div style={{ background: "#ffffff", padding: "6px 10px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Vendor Trust (7%)</div>
+                      <div style={{ fontSize: "13px", fontWeight: 700 }}>{ev.metrics.trustScore}/100</div>
+                    </div>
+                    <div style={{ background: "#ffffff", padding: "6px 10px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Item Experience (5%)</div>
+                      <div style={{ fontSize: "13px", fontWeight: 700 }}>{ev.metrics.experienceScore}/100</div>
+                    </div>
+                    <div style={{ background: "#ffffff", padding: "6px 10px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Recent Perf (5%)</div>
+                      <div style={{ fontSize: "13px", fontWeight: 700 }}>{ev.metrics.recentPerformanceScore}/100</div>
+                    </div>
+                  </div>
+
+                  {/* Reasons Breakdown */}
+                  {ev.isRecommended ? (
+                    <div style={{ fontSize: "12px", color: "#15803d", background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+                      <strong>Why Recommended:</strong>
+                      <ul style={{ margin: "4px 0 0 16px", padding: 0 }}>
+                        {ev.reasonsForSelection.map((r, idx) => (
+                          <li key={idx}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: "12px", color: "#b91c1c", background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid #fecaca" }}>
+                      <strong>Reasons Why Not Selected:</strong>
+                      <ul style={{ margin: "4px 0 0 16px", padding: 0 }}>
+                        {ev.reasonsAgainstSelection.map((r, idx) => (
+                          <li key={idx}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px" }}>
+              <button className="btn-clear" onClick={() => setActiveModalItem(null)}>
+                Close Breakdown
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Failed validations */}
       {failedRules.length > 0 && (
