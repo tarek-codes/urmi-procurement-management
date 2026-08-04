@@ -24,6 +24,7 @@ export default function FraudAnalyzerPage() {
   const [csFileName, setCsFileName] = useState<string | null>(null);
   const [histFileName, setHistFileName] = useState<string | null>(null);
   const [extractedNumbers, setExtractedNumbers] = useState<NumberItem[]>([]);
+  const [companyFilter, setCompanyFilter] = useState<string>("ALL");
   const [procurerFilter, setProcurerFilter] = useState<string>("ALL");
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +33,7 @@ export default function FraudAnalyzerPage() {
   const processUploadedFile = async (file: File) => {
     setIsProcessing(true);
     setError(null);
+    setCompanyFilter("ALL");
     setProcurerFilter("ALL");
     try {
       const buffer = await file.arrayBuffer();
@@ -41,12 +43,14 @@ export default function FraudAnalyzerPage() {
       const records = parseHistoricalFile(buffer);
       if (records.length > 0) {
         records.forEach((r) => {
-          const proc = r.company || "Unknown";
+          const comp = r.company || "Unknown";
+          const proc = (r as any).procurer || "Unknown";
           if (r.csAmount) {
             items.push({
               amount: r.csAmount,
               label: `CS Amount - ${r.csNo}`,
               context: `${r.company} (${r.supplierName})`,
+              company: comp,
               procurer: proc,
             });
           }
@@ -55,6 +59,7 @@ export default function FraudAnalyzerPage() {
               amount: r.poAmount,
               label: `PO Amount - ${r.poNo || "N/A"}`,
               context: `${r.company} (${r.supplierName})`,
+              company: comp,
               procurer: proc,
             });
           }
@@ -63,6 +68,7 @@ export default function FraudAnalyzerPage() {
               amount: r.billAmount,
               label: `Bill Amount - ${r.billNo || "N/A"}`,
               context: `${r.company} (${r.supplierName})`,
+              company: comp,
               procurer: proc,
             });
           }
@@ -71,6 +77,7 @@ export default function FraudAnalyzerPage() {
               amount: r.csRate,
               label: `CS Rate - ${r.itemName}`,
               context: `${r.company} (${r.supplierName})`,
+              company: comp,
               procurer: proc,
             });
           }
@@ -79,6 +86,7 @@ export default function FraudAnalyzerPage() {
               amount: r.poRate,
               label: `PO Rate - ${r.itemName}`,
               context: `${r.company} (${r.supplierName})`,
+              company: comp,
               procurer: proc,
             });
           }
@@ -97,12 +105,14 @@ export default function FraudAnalyzerPage() {
       const docs = parseExcelFile(buffer);
       if (docs.length > 0) {
         docs.forEach((doc) => {
-          const proc = doc.procurers.join(", ") || doc.companyName || "Unknown";
+          const comp = doc.companyName || "Unknown";
+          const proc = doc.procurers.join(", ") || "Unknown";
           if (doc.csMainValue) {
             items.push({
               amount: doc.csMainValue,
               label: `${doc.csNo} - Main Value`,
               context: `${doc.companyName} (${doc.procurers.join(", ")})`,
+              company: comp,
               procurer: proc,
             });
           }
@@ -113,6 +123,7 @@ export default function FraudAnalyzerPage() {
                   amount: q.unitRate,
                   label: `${doc.csNo} - ${it.itemName} (${q.supplierName})`,
                   context: `Unit Rate: $${q.unitRate}`,
+                  company: comp,
                   procurer: proc,
                 });
               }
@@ -121,6 +132,7 @@ export default function FraudAnalyzerPage() {
                   amount: q.totalPrice,
                   label: `${doc.csNo} - ${it.itemName} (${q.supplierName})`,
                   context: `Total Price: $${q.totalPrice}`,
+                  company: comp,
                   procurer: proc,
                 });
               }
@@ -144,7 +156,8 @@ export default function FraudAnalyzerPage() {
         const rawJson: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
         
         rawJson.forEach((row, rowIdx) => {
-          const proc = String(row["PROCURER"] || row["COMPANY"] || row["Company"] || "Unknown").trim();
+          const comp = String(row["COMPANY_NAME"] || row["COMPANY"] || row["Company"] || "Unknown").trim();
+          const proc = String(row["PROCURER"] || row["PURCHASER"] || row["BUYER"] || "Unknown").trim();
           Object.entries(row).forEach(([colKey, val]) => {
             let num = 0;
             if (typeof val === "number") num = val;
@@ -158,6 +171,7 @@ export default function FraudAnalyzerPage() {
                 amount: num,
                 label: `Row ${rowIdx + 1} - ${colKey}`,
                 context: `${colKey}: ${num}`,
+                company: comp,
                 procurer: proc,
               });
             }
@@ -188,6 +202,7 @@ export default function FraudAnalyzerPage() {
   const loadStoredDbBenford = async () => {
     setIsProcessing(true);
     setError(null);
+    setCompanyFilter("ALL");
     setProcurerFilter("ALL");
     try {
       const res = await fetch("/api/historical-db", {
@@ -199,12 +214,14 @@ export default function FraudAnalyzerPage() {
 
       const items: NumberItem[] = [];
       records.forEach((r) => {
-        const proc = r.company || "Unknown";
+        const comp = r.company || "Unknown";
+        const proc = (r as any).procurer || "Unknown";
         if (r.csAmount) {
           items.push({
             amount: r.csAmount,
             label: `CS Amount - ${r.csNo}`,
             context: `${r.company} (${r.supplierName})`,
+            company: comp,
             procurer: proc,
           });
         }
@@ -213,6 +230,7 @@ export default function FraudAnalyzerPage() {
             amount: r.poAmount,
             label: `PO Amount - ${r.poNo}`,
             context: `${r.company} (${r.supplierName})`,
+            company: comp,
             procurer: proc,
           });
         }
@@ -221,6 +239,7 @@ export default function FraudAnalyzerPage() {
             amount: r.billAmount,
             label: `Bill Amount - ${r.billNo}`,
             context: `${r.company} (${r.supplierName})`,
+            company: comp,
             procurer: proc,
           });
         }
@@ -236,17 +255,26 @@ export default function FraudAnalyzerPage() {
     }
   };
 
-  // List of unique procurers/companies in dataset
+  // List of unique companies in dataset
+  const companyOptions = useMemo(() => {
+    const set = new Set(extractedNumbers.map((i) => i.company).filter(Boolean));
+    return Array.from(set).sort();
+  }, [extractedNumbers]);
+
+  // List of unique procurers in dataset
   const procurerOptions = useMemo(() => {
     const set = new Set(extractedNumbers.map((i) => i.procurer).filter(Boolean));
     return Array.from(set).sort();
   }, [extractedNumbers]);
 
-  // Filtered numbers by selected procurer
+  // Filtered numbers by selected company and procurer
   const filteredNumbers = useMemo(() => {
-    if (procurerFilter === "ALL") return extractedNumbers;
-    return extractedNumbers.filter((i) => i.procurer === procurerFilter);
-  }, [extractedNumbers, procurerFilter]);
+    return extractedNumbers.filter((i) => {
+      if (companyFilter !== "ALL" && i.company !== companyFilter) return false;
+      if (procurerFilter !== "ALL" && i.procurer !== procurerFilter) return false;
+      return true;
+    });
+  }, [extractedNumbers, companyFilter, procurerFilter]);
 
   // Run Benford Analysis on filtered dataset
   const benfordResult: BenfordAnalysisResult | null = useMemo(() => {
@@ -376,10 +404,31 @@ export default function FraudAnalyzerPage() {
                 🛡️ Audited File: <strong>{csFileName || histFileName}</strong> ({benfordResult.totalNumbersAnalyzed.toLocaleString()} figures)
               </span>
 
-              {procurerOptions.length > 0 && (
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "var(--bg-subtle)", padding: "4px 10px", borderRadius: "6px", border: "1px solid var(--border)" }}>
+              {companyOptions.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "var(--bg-subtle)", padding: "4px 10px", borderRadius: "6px", border: "1px solid var(--border)" }}>
                   <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)" }}>
-                    Filter by Procurer / Company:
+                    Filter by Company:
+                  </label>
+                  <select
+                    className="filter-select"
+                    value={companyFilter}
+                    onChange={(e) => setCompanyFilter(e.target.value)}
+                    style={{ padding: "3px 8px", fontSize: "12px" }}
+                  >
+                    <option value="ALL">All Companies</option>
+                    {companyOptions.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {procurerOptions.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "var(--bg-subtle)", padding: "4px 10px", borderRadius: "6px", border: "1px solid var(--border)" }}>
+                  <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)" }}>
+                    Filter by Procurer:
                   </label>
                   <select
                     className="filter-select"
@@ -387,7 +436,7 @@ export default function FraudAnalyzerPage() {
                     onChange={(e) => setProcurerFilter(e.target.value)}
                     style={{ padding: "3px 8px", fontSize: "12px" }}
                   >
-                    <option value="ALL">All Procurers & Companies ({extractedNumbers.length.toLocaleString()})</option>
+                    <option value="ALL">All Procurers</option>
                     {procurerOptions.map((p) => (
                       <option key={p} value={p}>
                         {p}
@@ -404,6 +453,7 @@ export default function FraudAnalyzerPage() {
                 setExtractedNumbers([]);
                 setCsFileName(null);
                 setHistFileName(null);
+                setCompanyFilter("ALL");
                 setProcurerFilter("ALL");
               }}
             >

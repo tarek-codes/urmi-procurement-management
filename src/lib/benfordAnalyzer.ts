@@ -31,6 +31,7 @@ export interface NumberItem {
   amount: number;
   label: string;
   context: string;
+  company?: string;
   procurer?: string;
 }
 
