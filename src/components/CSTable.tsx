@@ -367,7 +367,7 @@ export default function CSTable({ onSelectCS }: Props) {
                     ) : (
                       <span className={`status-badge ${report.overallStatus}`}>
                         <span className="status-dot"></span>
-                        {report.overallStatus === "passed" ? "Passed" : "Review Needed"}
+                        {report.overallStatus === "passed" ? "OK" : "Review Needed"}
                       </span>
                     )}
                   </td>

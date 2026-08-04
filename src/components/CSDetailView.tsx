@@ -61,7 +61,7 @@ export default function CSDetailView({ report, onBack }: Props) {
             >
               <span className="status-dot"></span>
               {report.overallStatus === "passed"
-                ? "Validation Passed"
+                ? "OK"
                 : "Review Needed"}
             </span>
           </h1>
