@@ -5,7 +5,7 @@ import { useValidation } from "@/context/ValidationContext";
 import PaginationControls from "./PaginationControls";
 
 type StatusFilter = "all" | "passed" | "failed";
-type SortField = "csDate" | "errorCount" | "warningCount" | "csNo";
+type SortField = "csDate" | "errorCount" | "csNo";
 type SortOrder = "asc" | "desc";
 
 interface Props {
@@ -267,7 +267,6 @@ export default function CSTable({ onSelectCS }: Props) {
               <option value="supplierCount-desc">Suppliers Count (Highest First)</option>
               <option value="supplierCount-asc">Suppliers Count (Lowest First)</option>
               <option value="errorCount-desc">Errors (Highest First)</option>
-              <option value="warningCount-desc">Warnings (Highest First)</option>
               <option value="csNo-asc">CS Number (A-Z)</option>
             </select>
           </div>
@@ -334,16 +333,13 @@ export default function CSTable({ onSelectCS }: Props) {
               <th onClick={() => handleSort("errorCount")} className="sortable-th">
                 Errors {sortField === "errorCount" && (sortOrder === "asc" ? "▲" : "▼")}
               </th>
-              <th onClick={() => handleSort("warningCount")} className="sortable-th">
-                Warnings {sortField === "warningCount" && (sortOrder === "asc" ? "▲" : "▼")}
-              </th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {paginatedReports.length === 0 ? (
               <tr>
-                <td colSpan={11} style={{ textAlign: "center", padding: "32px", color: "var(--text-tertiary)" }}>
+                <td colSpan={10} style={{ textAlign: "center", padding: "32px", color: "var(--text-tertiary)" }}>
                   No Comparative Statements match your current filters.
                 </td>
               </tr>
@@ -378,11 +374,6 @@ export default function CSTable({ onSelectCS }: Props) {
                   <td>
                     <span className={`count-badge ${report.errorCount > 0 ? "error-count" : "zero"}`}>
                       {report.errorCount}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`count-badge ${report.warningCount > 0 ? "warning-count" : "zero"}`}>
-                      {report.warningCount}
                     </span>
                   </td>
                   <td>
