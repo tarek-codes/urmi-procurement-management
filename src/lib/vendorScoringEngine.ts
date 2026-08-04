@@ -62,32 +62,41 @@ export function evaluateItemVendorRecommendations(
       };
     }
 
-    // Filter historical records for this specific item (by TS_ID or ITEM_NAME)
-    const itemHistRecords = historicalRecords.filter(
-      (r) =>
-        (r.tsId && item.tsId && String(r.tsId) === String(item.tsId)) ||
-        (r.itemName && item.itemName && r.itemName.toLowerCase() === item.itemName.toLowerCase())
-    );
+    // Filter historical records for this specific item (fuzzy match name or TS ID or item ID)
+    const normItemName = item.itemName.toLowerCase().trim();
+    const itemHistRecords = historicalRecords.filter((r) => {
+      if (r.tsId && item.tsId && String(r.tsId) === String(item.tsId)) return true;
+      if (r.itemId && (item as any).itemId && String(r.itemId) === String((item as any).itemId)) return true;
+      if (!r.itemName) return false;
+      const rName = r.itemName.toLowerCase().trim();
+      return rName === normItemName || rName.includes(normItemName) || normItemName.includes(rName);
+    });
 
     // 1. Metric 1: Current CS Price Competitiveness (30%)
     const lowestCurrentQuote = Math.min(...item.quotations.map((q) => q.unitRate));
 
-    // 2. Metric 2: Historical Win Rate (15%)
-    const totalItemPOs = itemHistRecords.filter((r) => r.poNo).length;
-    const vendorWins: Record<string, number> = {};
+    // 2. Metric 2: Historical Win Rate (10%) & Item Experience PO Counts (15%)
+    const totalItemPOs = itemHistRecords.filter((r) => r.poNo || r.poQty > 0 || r.poRate > 0).length;
+    const vendorItemPOCounts: Record<string, number> = {};
     item.quotations.forEach((q) => {
-      const wins = itemHistRecords.filter(
-        (r) => r.supplierName.toLowerCase() === q.supplierName.toLowerCase() && r.poNo
+      const qSupplierLower = q.supplierName.toLowerCase().trim();
+      const pos = itemHistRecords.filter(
+        (r) =>
+          r.supplierName.toLowerCase().trim() === qSupplierLower ||
+          r.supplierName.toLowerCase().includes(qSupplierLower) ||
+          qSupplierLower.includes(r.supplierName.toLowerCase().trim())
       ).length;
-      vendorWins[q.supplierName] = wins;
+      vendorItemPOCounts[q.supplierName] = pos;
     });
 
     // 3. Metric 3: Delivery Performance (10%)
     const vendorAvgDeliveries: Record<string, number> = {};
     item.quotations.forEach((q) => {
+      const qSupplierLower = q.supplierName.toLowerCase().trim();
       const delRecords = itemHistRecords.filter(
         (r) =>
-          r.supplierName.toLowerCase() === q.supplierName.toLowerCase() &&
+          (r.supplierName.toLowerCase().trim() === qSupplierLower ||
+            r.supplierName.toLowerCase().includes(qSupplierLower)) &&
           r.poDate &&
           r.grnDate
       );
@@ -104,11 +113,17 @@ export function evaluateItemVendorRecommendations(
     const deliveryDaysList = Object.values(vendorAvgDeliveries);
     const fastestDelivery = deliveryDaysList.length > 0 ? Math.min(...deliveryDaysList) : 0;
 
-    // 4. Metric 4: Price Consistency (8%)
+    // 4. Metric 4: Price Consistency (15%)
     const vendorCVs: Record<string, number> = {};
     item.quotations.forEach((q) => {
+      const qSupplierLower = q.supplierName.toLowerCase().trim();
       const rates = itemHistRecords
-        .filter((r) => r.supplierName.toLowerCase() === q.supplierName.toLowerCase() && r.poRate > 0)
+        .filter(
+          (r) =>
+            (r.supplierName.toLowerCase().trim() === qSupplierLower ||
+              r.supplierName.toLowerCase().includes(qSupplierLower)) &&
+            r.poRate > 0
+        )
         .map((r) => r.poRate);
       if (rates.length > 1) {
         const mean = rates.reduce((s, r) => s + r, 0) / rates.length;
@@ -121,8 +136,18 @@ export function evaluateItemVendorRecommendations(
     });
     const maxCV = Math.max(...Object.values(vendorCVs), 0.01);
 
-    // 6. Metric 6: Item Experience (5%)
-    const maxItemPOCount = Math.max(...Object.values(vendorWins), 1);
+    // Calculate maximum item PO count across all suppliers in historical database for this item
+    // (If 0 POs in historical DB for this exact item, check global supplier item experience)
+    const allSuppliersItemPOCounts = new Set<number>(Object.values(vendorItemPOCounts));
+    itemHistRecords.forEach((r) => {
+      if (r.supplierName) {
+        const count = itemHistRecords.filter(
+          (subR) => subR.supplierName.toLowerCase() === r.supplierName.toLowerCase()
+        ).length;
+        allSuppliersItemPOCounts.add(count);
+      }
+    });
+    const highestItemPOCount = Math.max(...Array.from(allSuppliersItemPOCounts), 1);
 
     // Evaluate each vendor
     const rawEvaluations: Omit<VendorItemEvaluation, "rank">[] = item.quotations.map((q) => {
@@ -131,10 +156,10 @@ export function evaluateItemVendorRecommendations(
       // 1. Current Price Score (30%)
       const currentPriceScore = q.unitRate > 0 ? Math.round((lowestCurrentQuote / q.unitRate) * 1000) / 10 : 0;
 
-      // 2. Win Rate Score (15%)
-      let winRateScore = 50; // Neutral default for new suppliers
+      // 2. Win Rate Score (10%)
+      let winRateScore = 50; // Neutral default for new suppliers without item history
       if (totalItemPOs > 0) {
-        winRateScore = Math.round(((vendorWins[vName] || 0) / totalItemPOs) * 1000) / 10;
+        winRateScore = Math.round(((vendorItemPOCounts[vName] || 0) / totalItemPOs) * 1000) / 10;
       }
 
       // 3. Delivery Score (10%)
@@ -143,16 +168,19 @@ export function evaluateItemVendorRecommendations(
         deliveryScore = Math.round((fastestDelivery / vendorAvgDeliveries[vName]) * 1000) / 10;
       }
 
-      // 4. Price Consistency Score (8%)
+      // 4. Price Consistency Score (15%)
       const cv = vendorCVs[vName] || 0;
       const consistencyScore = Math.round((1 - cv / (maxCV * 1.2)) * 1000) / 10;
 
-      // 5. Supplier Trust / Loyalty Score (32%) - Global
+      // 5. Supplier Trust / Loyalty Score (20%) - Global
       const trustScore = globalTrustScores[vName] || 50;
 
-      // 6. Item Experience Score (5%)
-      const expCount = vendorWins[vName] || 0;
-      const experienceScore = Math.round((expCount / maxItemPOCount) * 1000) / 10;
+      // 6. Item Experience Score (15%): (Supplier Item Count / Highest Item Count) * 100
+      const supplierItemCount = vendorItemPOCounts[vName] || 0;
+      let experienceScore = 50; // Default neutral for new suppliers
+      if (highestItemPOCount > 0 && totalItemPOs > 0) {
+        experienceScore = Math.round((supplierItemCount / highestItemPOCount) * 1000) / 10;
+      }
 
       // Weighted Final Score:
       // (30% Current Price) + (20% Trust) + (15% Consistency) + (15% Experience) + (10% Win Rate) + (10% Delivery) = 100%
