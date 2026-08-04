@@ -127,13 +127,24 @@ export function parseExcelFile(buffer: ArrayBuffer): CSDocument[] {
 function extractQuotations(row: Record<string, unknown>): SupplierQuotation[] {
   const quotations: SupplierQuotation[] = [];
 
-  // Helper to find value across multiple candidate key patterns
-  const findVal = (rowObj: Record<string, unknown>, ...patterns: string[]): unknown => {
-    for (const pat of patterns) {
-      for (const [k, v] of Object.entries(rowObj)) {
-        const normK = k.trim().replace(/\s+/g, "_").toUpperCase();
-        if (normK === pat || normK.includes(pat)) {
-          if (v !== undefined && v !== "" && v !== null) return v;
+  // Normalise row keys to uppercase with underscores
+  const normObj: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(row)) {
+    normObj[k.trim().replace(/\s+/g, "_").toUpperCase()] = v;
+  }
+
+  // Helper to find value by exact normalized key or pattern
+  const getVal = (exactKey: string, ...fallbackKeys: string[]): unknown => {
+    if (normObj[exactKey] !== undefined && normObj[exactKey] !== "" && normObj[exactKey] !== null) {
+      return normObj[exactKey];
+    }
+    for (const fb of fallbackKeys) {
+      if (normObj[fb] !== undefined && normObj[fb] !== "" && normObj[fb] !== null) {
+        return normObj[fb];
+      }
+      for (const [k, v] of Object.entries(normObj)) {
+        if ((k === fb || k.endsWith(fb) || k.includes(fb)) && v !== undefined && v !== "" && v !== null) {
+          return v;
         }
       }
     }
@@ -141,51 +152,26 @@ function extractQuotations(row: Record<string, unknown>): SupplierQuotation[] {
   };
 
   for (let i = 1; i <= 10; i++) {
-    // Look up supplier name with multiple possible column key variations
-    const rawName = findVal(
-      row,
-      `SUPPLIER_NAME_${i}`,
-      `SUPPLIER_${i}`,
-      `VENDOR_NAME_${i}`,
-      `VENDOR_${i}`,
-      `SUPPLIER_NAME${i}`,
-      `SUPPLIER${i}`
-    );
+    const rawName = i === 1
+      ? getVal("SUPPLIER_NAME_1", "SUPPLIER_NAME", "SUPPLIER_1", "VENDOR_NAME_1", "VENDOR_1")
+      : getVal(`SUPPLIER_NAME_${i}`, `SUPPLIER_${i}`, `VENDOR_NAME_${i}`, `VENDOR_${i}`);
 
     const name = String(rawName || "").trim();
     if (!name || name.toUpperCase() === "N/A" || name.toUpperCase() === "UNDEFINED") continue;
 
-    // Look up unit rate
-    const rawRate = findVal(
-      row,
-      `UNIT_RATE_${i}`,
-      `RATE_${i}`,
-      `UNIT_PRICE_${i}`,
-      `PRICE_${i}`,
-      `UNIT_RATE${i}`,
-      `RATE${i}`
-    );
+    const rawRate = i === 1
+      ? getVal("UNIT_RATE_1", "UNIT_RATE", "RATE_1", "RATE")
+      : getVal(`UNIT_RATE_${i}`, `RATE_${i}`, `UNIT_PRICE_${i}`, `PRICE_${i}`);
     const unitRate = parseNumeric(rawRate);
 
-    // Look up quantity
-    const rawQty = findVal(
-      row,
-      `QTY_${i}`,
-      `QUANTITY_${i}`,
-      `QTY${i}`,
-      `QUANTITY${i}`
-    );
+    const rawQty = i === 1
+      ? getVal("QTY_1", "QTY", "QUANTITY_1", "QUANTITY")
+      : getVal(`QTY_${i}`, `QUANTITY_${i}`, `QTY${i}`);
     const quantity = parseNumeric(rawQty) || 1;
 
-    // Look up total price
-    const rawTotal = findVal(
-      row,
-      `TOTAL_PRICE_${i}`,
-      `TOTAL_AMOUNT_${i}`,
-      `TOTAL_${i}`,
-      `AMOUNT_${i}`,
-      `TOTAL_PRICE${i}`
-    );
+    const rawTotal = i === 1
+      ? getVal("TOTAL_PRICE_1", "TOTAL_PRICE", "TOTAL_1", "TOTAL", "AMOUNT_1")
+      : getVal(`TOTAL_PRICE_${i}`, `TOTAL_AMOUNT_${i}`, `TOTAL_${i}`, `AMOUNT_${i}`);
     const totalPrice = parseNumeric(rawTotal) || (unitRate * quantity);
 
     quotations.push({
