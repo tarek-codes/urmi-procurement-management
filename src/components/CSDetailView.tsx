@@ -244,7 +244,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                           <div style={{ fontSize: "11px", color: "#166534", marginTop: "1px", fontWeight: 600 }}>
                             ${rec?.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} / unit (${rec?.quotation?.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })} Total)
                           </div>
-                          
+
                           <div style={{ marginTop: "6px", fontSize: "10px", color: "#15803d", borderTop: "1px dashed #bbf7d0", paddingTop: "4px" }}>
                             <strong>Key Reasons:</strong>
                             <ul style={{ margin: "2px 0 0 12px", padding: 0 }}>
@@ -360,37 +360,37 @@ export default function CSDetailView({ report, onBack }: Props) {
                     <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                       <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Current Price (30%)</div>
                       <div style={{ fontSize: "14px", fontWeight: 700 }}>
-                        {((ev.metrics.currentPriceScore * 0.30)).toFixed(1)} / 30
+                        {((ev.metrics.currentPriceScore * 0.30)).toFixed(2)} / 30
                       </div>
                     </div>
                     <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                       <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Supplier Trust & Loyalty (20%)</div>
                       <div style={{ fontSize: "14px", fontWeight: 700, color: "#15803d" }}>
-                        {((ev.metrics.trustScore * 0.20)).toFixed(1)} / 20
+                        {((ev.metrics.trustScore * 0.20)).toFixed(2)} / 20
                       </div>
                     </div>
                     <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                       <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Price Consistency (15%)</div>
                       <div style={{ fontSize: "14px", fontWeight: 700 }}>
-                        {((ev.metrics.consistencyScore * 0.15)).toFixed(1)} / 15
+                        {((ev.metrics.consistencyScore * 0.15)).toFixed(2)} / 15
                       </div>
                     </div>
                     <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                       <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Item Experience (15%)</div>
                       <div style={{ fontSize: "14px", fontWeight: 700 }}>
-                        {((ev.metrics.experienceScore * 0.15)).toFixed(1)} / 15
+                        {((ev.metrics.experienceScore * 0.15)).toFixed(2)} / 15
                       </div>
                     </div>
                     <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                       <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Historical Win Rate (10%)</div>
                       <div style={{ fontSize: "14px", fontWeight: 700 }}>
-                        {((ev.metrics.winRateScore * 0.10)).toFixed(1)} / 10
+                        {((ev.metrics.winRateScore * 0.10)).toFixed(2)} / 10
                       </div>
                     </div>
                     <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                       <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Delivery Speed (10%)</div>
                       <div style={{ fontSize: "14px", fontWeight: 700 }}>
-                        {((ev.metrics.deliveryScore * 0.10)).toFixed(1)} / 10
+                        {((ev.metrics.deliveryScore * 0.10)).toFixed(2)} / 10
                       </div>
                     </div>
                   </div>
