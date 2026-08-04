@@ -177,6 +177,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: "8px" }}>
                         {itemRec.evaluations.map((ev) => {
                           const isRec = ev.isRecommended;
+                          const isSelected = displaySupplier?.vendorName === ev.vendorName;
 
                           let badgeStyle: React.CSSProperties = {
                             padding: "8px 12px",
@@ -186,24 +187,45 @@ export default function CSDetailView({ report, onBack }: Props) {
                             display: "flex",
                             flexDirection: "column",
                             gap: "4px",
+                            cursor: itemRec.evaluations.length > 1 ? "pointer" : "default",
+                            transition: "all 0.15s ease",
                           };
 
-                          if (isRec) {
+                          if (isSelected) {
                             badgeStyle = {
                               ...badgeStyle,
-                              background: "#f0fdf4",
-                              borderColor: "#16a34a",
-                              boxShadow: "0 1px 3px rgba(22, 163, 74, 0.15)",
+                              background: activeOverride ? "#eff6ff" : "#f0fdf4",
+                              borderColor: activeOverride ? "#3b82f6" : "#16a34a",
+                              boxShadow: `0 2px 5px ${activeOverride ? "rgba(59, 130, 246, 0.25)" : "rgba(22, 163, 74, 0.2)"}`,
                             };
                           }
 
                           return (
-                            <div key={ev.vendorName} style={badgeStyle}>
+                            <div
+                              key={ev.vendorName}
+                              style={badgeStyle}
+                              title={itemRec.evaluations.length > 1 ? `Click to select ${ev.vendorName}` : ev.vendorName}
+                              onClick={() => {
+                                if (itemRec.evaluations.length <= 1) return;
+                                if (ev.vendorName !== (rec?.vendorName || "")) {
+                                  setOverrideModal({
+                                    itemRec,
+                                    targetSupplierName: ev.vendorName,
+                                    reasonText: activeOverride?.supplierName === ev.vendorName ? activeOverride.auditReason : "",
+                                  });
+                                } else {
+                                  // Reset override if user clicks AI recommended supplier back
+                                  const copy = { ...overrides };
+                                  delete copy[itemRec.slNo];
+                                  setOverrides(copy);
+                                }
+                              }}
+                            >
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "4px" }}>
-                                <span style={{ fontWeight: 700, fontSize: "12px", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px" }} title={ev.vendorName}>
-                                  #{ev.rank} {ev.vendorName}
+                                <span style={{ fontWeight: 700, fontSize: "12px", color: isSelected ? (activeOverride ? "#1e40af" : "#15803d") : "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px" }} title={ev.vendorName}>
+                                  #{ev.rank} {ev.vendorName} {isSelected ? "✓" : ""}
                                 </span>
-                                <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", background: isRec ? "#16a34a" : "#64748b", color: "#ffffff" }}>
+                                <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", background: isSelected ? (activeOverride ? "#2563eb" : "#16a34a") : "#64748b", color: "#ffffff" }}>
                                   Score: {ev.finalScore}
                                 </span>
                               </div>
@@ -216,7 +238,6 @@ export default function CSDetailView({ report, onBack }: Props) {
                                   Total: ${ev.quotation?.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                                 </span>
                               </div>
-
                             </div>
                           );
                         })}
@@ -407,8 +428,41 @@ export default function CSDetailView({ report, onBack }: Props) {
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: "16px", fontWeight: 800, color: ev.isRecommended ? "#15803d" : "var(--text-primary)" }}>
-                      Composite Score: {ev.finalScore} / 100
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      {activeModalItem.evaluations.length > 1 && (
+                        <button
+                          onClick={() => {
+                            const rec = activeModalItem.recommendedVendor;
+                            if (ev.vendorName !== (rec?.vendorName || "")) {
+                              setOverrideModal({
+                                itemRec: activeModalItem,
+                                targetSupplierName: ev.vendorName,
+                                reasonText: overrides[activeModalItem.slNo]?.supplierName === ev.vendorName ? overrides[activeModalItem.slNo].auditReason : "",
+                              });
+                            } else {
+                              const copy = { ...overrides };
+                              delete copy[activeModalItem.slNo];
+                              setOverrides(copy);
+                            }
+                            setActiveModalItem(null);
+                          }}
+                          style={{
+                            padding: "4px 10px",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            borderRadius: "4px",
+                            border: "none",
+                            background: overrides[activeModalItem.slNo]?.supplierName === ev.vendorName || (!overrides[activeModalItem.slNo] && ev.isRecommended) ? "#16a34a" : "#2563eb",
+                            color: "#ffffff",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {overrides[activeModalItem.slNo]?.supplierName === ev.vendorName || (!overrides[activeModalItem.slNo] && ev.isRecommended) ? "✓ Selected" : "Select Supplier"}
+                        </button>
+                      )}
+                      <div style={{ fontSize: "16px", fontWeight: 800, color: ev.isRecommended ? "#15803d" : "var(--text-primary)" }}>
+                        Composite Score: {ev.finalScore} / 100
+                      </div>
                     </div>
                   </div>
 
