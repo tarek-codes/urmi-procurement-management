@@ -104,3 +104,15 @@ export interface CSValidationReport {
   csMainValue: number;
   calculatedTotal: number;
 }
+
+// ── Selected Supplier Audit Record ────────────────────────────────────
+export interface CsSupplierSelectionRecord {
+  id: string;
+  csNo: string;
+  procurer: string;
+  selectedSupplier: string;
+  reasonNote: string;
+  selectedAt: string;
+  status: "Pending" | "Approved" | "Rejected";
+  auditNote?: string;
+}

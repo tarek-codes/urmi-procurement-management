@@ -106,7 +106,7 @@ function DropZone({
 }
 
 export default function CSValidatorPage() {
-  const { reports, csFileName, histFileName, isProcessing, error, processFiles, clearData } = useValidation();
+  const { reports, csFileName, histFileName, isProcessing, error, selectedSuppliers, processFiles, clearData } = useValidation();
   const [selectedCsId, setSelectedCsId] = useState<string | null>(null);
 
   const [csFile, setCsFile] = useState<File | null>(null);
@@ -143,13 +143,69 @@ export default function CSValidatorPage() {
       </div>
 
       {/* Module Title */}
-      <div style={{ marginBottom: "var(--space-xl)" }}>
+      <div style={{ marginBottom: "var(--space-md)" }}>
         <h1 style={{ fontSize: "24px", fontWeight: 700, letterSpacing: "-0.02em" }}>
           CS Validator
         </h1>
         <p style={{ fontSize: "14px", color: "var(--text-secondary)" }}>
           Comparative Statement Validation & Rule Enforcement
         </p>
+      </div>
+
+      {/* Module Navigation Tabs */}
+      <div
+        style={{
+          display: "flex",
+          gap: "10px",
+          marginBottom: "var(--space-xl)",
+          borderBottom: "1px solid var(--border)",
+          paddingBottom: "12px",
+        }}
+      >
+        <Link
+          href="/cs-validator"
+          style={{
+            padding: "8px 18px",
+            borderRadius: "6px",
+            fontWeight: 700,
+            fontSize: "13px",
+            background: "#2563eb",
+            color: "#ffffff",
+            textDecoration: "none",
+          }}
+        >
+          📋 CS Validator
+        </Link>
+        <Link
+          href="/cs-validator/selected-suppliers"
+          style={{
+            padding: "8px 18px",
+            borderRadius: "6px",
+            fontWeight: 600,
+            fontSize: "13px",
+            background: "var(--bg-subtle)",
+            color: "var(--text-secondary)",
+            border: "1px solid var(--border)",
+            textDecoration: "none",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+          }}
+        >
+          <span>🏆 Selected Suppliers</span>
+          <span
+            style={{
+              background: "#e2e8f0",
+              color: "#334155",
+              fontSize: "11px",
+              fontWeight: 700,
+              padding: "1px 6px",
+              borderRadius: "10px",
+            }}
+          >
+            {selectedSuppliers.length}
+          </span>
+        </Link>
       </div>
 
       {/* Two-file upload zone — only when no data loaded */}

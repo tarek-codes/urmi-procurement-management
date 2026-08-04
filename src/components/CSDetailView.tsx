@@ -15,7 +15,7 @@ interface Props {
 }
 
 export default function CSDetailView({ report, onBack }: Props) {
-  const { historicalRecords } = useValidation();
+  const { historicalRecords, saveSelection } = useValidation();
   const [activeModalItem, setActiveModalItem] = useState<ItemRecommendationResult | null>(null);
 
   // Single confirmed CS supplier selection state for the entire CS
@@ -808,6 +808,12 @@ export default function CSDetailView({ report, onBack }: Props) {
                     supplierName: confirmModal.targetSupplierName,
                     auditReason: confirmModal.reasonText.trim(),
                     isRecommended: confirmModal.isRecommended,
+                  });
+                  saveSelection({
+                    csNo: report.csNo,
+                    procurer: report.procurer,
+                    selectedSupplier: confirmModal.targetSupplierName,
+                    reasonNote: confirmModal.reasonText.trim(),
                   });
                   setConfirmModal(null);
                 }}
