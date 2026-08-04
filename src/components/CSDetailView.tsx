@@ -18,6 +18,18 @@ export default function CSDetailView({ report, onBack }: Props) {
   const { records: historicalRecords } = useHistorical();
   const [activeModalItem, setActiveModalItem] = useState<ItemRecommendationResult | null>(null);
 
+  // Manual supplier selection overrides state keyed by item slNo
+  const [overrides, setOverrides] = useState<
+    Record<number, { supplierName: string; auditReason: string }>
+  >({});
+
+  // Active item pending override selection modal state
+  const [overrideModal, setOverrideModal] = useState<{
+    itemRec: ItemRecommendationResult;
+    targetSupplierName: string;
+    reasonText: string;
+  } | null>(null);
+
   const failedRules = report.results.filter((r) => r.status === "failed");
   const passedRules = report.results.filter((r) => r.status === "passed");
 
@@ -132,6 +144,10 @@ export default function CSDetailView({ report, onBack }: Props) {
             <tbody>
               {itemRecommendations.map((itemRec) => {
                 const rec = itemRec.recommendedVendor;
+                const activeOverride = overrides[itemRec.slNo];
+                const displaySupplier = activeOverride
+                  ? itemRec.evaluations.find((e) => e.vendorName === activeOverride.supplierName) || rec
+                  : rec;
 
                 return (
                   <tr key={itemRec.slNo}>
@@ -225,28 +241,75 @@ export default function CSDetailView({ report, onBack }: Props) {
                           </div>
                         </div>
                       ) : (
-                        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "8px 10px", borderRadius: "6px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ fontSize: "11px", color: "#166534", fontWeight: 700 }}>💡 Recommended Supplier:</span>
-                            <span style={{ fontSize: "10px", fontWeight: 700, background: "#16a34a", color: "white", padding: "1px 5px", borderRadius: "3px" }}>
-                              Score {rec?.finalScore}/100
-                            </span>
-                          </div>
-                          <div style={{ fontSize: "13px", fontWeight: 700, color: "#15803d", marginTop: "3px" }}>
-                            {rec?.vendorName}
-                          </div>
-                          <div style={{ fontSize: "11px", color: "#166534", marginTop: "1px", fontWeight: 600 }}>
-                            ${rec?.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} / unit (${rec?.quotation?.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })} Total)
+                        <div style={{ background: activeOverride ? "#eff6ff" : "#f0fdf4", border: `1px solid ${activeOverride ? "#bfdbfe" : "#bbf7d0"}`, padding: "8px 10px", borderRadius: "6px" }}>
+                          {/* Selection Dropdown */}
+                          <div style={{ marginBottom: "6px" }}>
+                            <label style={{ fontSize: "10px", fontWeight: 700, color: activeOverride ? "#1e40af" : "#166534", display: "block", marginBottom: "2px" }}>
+                              {activeOverride ? "✍️ Manually Selected Supplier:" : "💡 Recommended Supplier:"}
+                            </label>
+                            <select
+                              value={activeOverride ? activeOverride.supplierName : rec?.vendorName || ""}
+                              onChange={(e) => {
+                                const selectedName = e.target.value;
+                                if (selectedName !== (rec?.vendorName || "")) {
+                                  setOverrideModal({
+                                    itemRec,
+                                    targetSupplierName: selectedName,
+                                    reasonText: "",
+                                  });
+                                } else {
+                                  // Reset override if user selects AI recommended back
+                                  const copy = { ...overrides };
+                                  delete copy[itemRec.slNo];
+                                  setOverrides(copy);
+                                }
+                              }}
+                              style={{
+                                width: "100%",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                padding: "3px 6px",
+                                borderRadius: "4px",
+                                border: `1px solid ${activeOverride ? "#3b82f6" : "#16a34a"}`,
+                                background: "#ffffff",
+                                color: "#1e293b",
+                                cursor: "pointer",
+                              }}
+                            >
+                              {itemRec.evaluations.map((ev) => (
+                                <option key={ev.vendorName} value={ev.vendorName}>
+                                  Rank #{ev.rank}: {ev.vendorName} (${ev.quotation?.unitRate}/unit - {ev.finalScore} pts) {ev.vendorName === rec?.vendorName ? " [AI Top Recommended]" : ""}
+                                </option>
+                              ))}
+                            </select>
                           </div>
 
-                          <div style={{ marginTop: "6px", fontSize: "10px", color: "#15803d", borderTop: "1px dashed #bbf7d0", paddingTop: "4px" }}>
-                            <strong>Key Reasons:</strong>
-                            <ul style={{ margin: "2px 0 0 12px", padding: 0 }}>
-                              {rec?.reasonsForSelection.slice(0, 2).map((r, idx) => (
-                                <li key={idx}>{r}</li>
-                              ))}
-                            </ul>
-                          </div>
+                          {/* Selected supplier info */}
+                          {displaySupplier && (
+                            <>
+                              <div style={{ fontSize: "11px", color: activeOverride ? "#1e40af" : "#166534", fontWeight: 600 }}>
+                                ${displaySupplier.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} / unit (${displaySupplier.quotation?.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })} Total)
+                              </div>
+
+                              {activeOverride ? (
+                                <div style={{ marginTop: "6px", fontSize: "10px", color: "#1e40af", borderTop: "1px dashed #bfdbfe", paddingTop: "4px" }}>
+                                  <strong>📝 Audit Reason Note:</strong>
+                                  <div style={{ marginTop: "2px", fontStyle: "italic", background: "#ffffff", padding: "4px 6px", borderRadius: "3px", border: "1px solid #dbeafe" }}>
+                                    "{activeOverride.auditReason}"
+                                  </div>
+                                </div>
+                              ) : (
+                                <div style={{ marginTop: "6px", fontSize: "10px", color: "#15803d", borderTop: "1px dashed #bbf7d0", paddingTop: "4px" }}>
+                                  <strong>Key Reasons:</strong>
+                                  <ul style={{ margin: "2px 0 0 12px", padding: 0 }}>
+                                    {rec?.reasonsForSelection.slice(0, 2).map((r, idx) => (
+                                      <li key={idx}>{r}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
                       )}
                     </td>
@@ -416,6 +479,126 @@ export default function CSDetailView({ report, onBack }: Props) {
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px" }}>
               <button className="btn-clear" onClick={() => setActiveModalItem(null)}>
                 Close Breakdown
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mandatory Audit Reason Note Modal for Manual Supplier Overrides */}
+      {overrideModal && (
+        <div
+          className="modal-overlay"
+          onClick={() => setOverrideModal(null)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(15, 23, 42, 0.65)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1100,
+            padding: "16px",
+          }}
+        >
+          <div
+            className="modal-card"
+            style={{
+              maxWidth: "500px",
+              width: "100%",
+              background: "#ffffff",
+              borderRadius: "12px",
+              padding: "24px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+              <span style={{ fontSize: "24px" }}>✍️</span>
+              <div>
+                <h3 style={{ fontSize: "17px", fontWeight: 700, margin: 0, color: "#1e293b" }}>
+                  Mandatory Audit Reason Note
+                </h3>
+                <p style={{ fontSize: "12px", color: "#64748b", margin: "2px 0 0 0" }}>
+                  Item: <strong>{overrideModal.itemRec.itemName}</strong>
+                </p>
+              </div>
+            </div>
+
+            <div style={{ background: "#f1f5f9", padding: "10px 12px", borderRadius: "6px", marginBottom: "16px", fontSize: "12px", color: "#334155" }}>
+              You are manually overriding the AI recommended supplier to select:
+              <div style={{ fontWeight: 700, color: "#1e40af", fontSize: "13px", marginTop: "2px" }}>
+                {overrideModal.targetSupplierName}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#1e293b", marginBottom: "6px" }}>
+                Audit Justification / Procurement Reason <span style={{ color: "#dc2626" }}>*</span>
+              </label>
+              <textarea
+                value={overrideModal.reasonText}
+                onChange={(e) =>
+                  setOverrideModal({
+                    ...overrideModal,
+                    reasonText: e.target.value,
+                  })
+                }
+                placeholder="e.g. Urgent emergency delivery required within 24 hours / Specific technical brand sample approved by department head..."
+                rows={4}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  fontSize: "13px",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                  outline: "none",
+                  fontFamily: "inherit",
+                  resize: "vertical",
+                }}
+              />
+              <span style={{ fontSize: "11px", color: "#64748b", marginTop: "4px", display: "block" }}>
+                A mandatory justification note is required for internal & external procurement compliance audits.
+              </span>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+              <button
+                className="btn-clear"
+                onClick={() => setOverrideModal(null)}
+                style={{ padding: "8px 14px", fontSize: "12px" }}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={!overrideModal.reasonText.trim()}
+                onClick={() => {
+                  if (!overrideModal.reasonText.trim()) return;
+                  setOverrides({
+                    ...overrides,
+                    [overrideModal.itemRec.slNo]: {
+                      supplierName: overrideModal.targetSupplierName,
+                      auditReason: overrideModal.reasonText.trim(),
+                    },
+                  });
+                  setOverrideModal(null);
+                }}
+                style={{
+                  padding: "8px 16px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  background: overrideModal.reasonText.trim() ? "#1e40af" : "#94a3b8",
+                  color: "#ffffff",
+                  borderRadius: "6px",
+                  border: "none",
+                  cursor: overrideModal.reasonText.trim() ? "pointer" : "not-allowed",
+                }}
+              >
+                Confirm & Save Audit Reason Note
               </button>
             </div>
           </div>
