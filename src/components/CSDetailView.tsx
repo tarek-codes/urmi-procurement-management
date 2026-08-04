@@ -184,13 +184,8 @@ export default function CSDetailView({ report, onBack }: Props) {
                           return (
                             <div key={ev.vendorName} style={badgeStyle}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "4px" }}>
-                                <span style={{ fontWeight: 700, fontSize: "12px", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px", display: "flex", alignItems: "center", gap: "4px" }} title={ev.vendorName}>
+                                <span style={{ fontWeight: 700, fontSize: "12px", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px" }} title={ev.vendorName}>
                                   #{ev.rank} {ev.vendorName}
-                                  {ev.isNewSupplier && (
-                                    <span style={{ fontSize: "9px", fontWeight: 700, background: "#0284c7", color: "white", padding: "1px 4px", borderRadius: "3px" }}>
-                                      NEW
-                                    </span>
-                                  )}
                                 </span>
                                 <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", background: isRec ? "#16a34a" : "#64748b", color: "#ffffff" }}>
                                   Score: {ev.finalScore}
@@ -343,11 +338,6 @@ export default function CSDetailView({ report, onBack }: Props) {
                       <span style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-primary)" }}>
                         Rank #{ev.rank}: {ev.vendorName}
                       </span>
-                      {ev.isNewSupplier && (
-                        <span style={{ background: "#0284c7", color: "white", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: 700 }}>
-                          🆕 NEW SUPPLIER
-                        </span>
-                      )}
                       {ev.isRecommended && (
                         <span style={{ background: "#16a34a", color: "white", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: 700 }}>
                           💡 RECOMMENDED SUPPLIER
