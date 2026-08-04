@@ -263,73 +263,39 @@ export default function CSDetailView({ report, onBack }: Props) {
                         </div>
                       ) : (
                         <div style={{ background: activeOverride ? "#eff6ff" : "#f0fdf4", border: `1px solid ${activeOverride ? "#bfdbfe" : "#bbf7d0"}`, padding: "8px 10px", borderRadius: "6px" }}>
-                          {/* Selection Dropdown */}
-                          <div style={{ marginBottom: "6px" }}>
-                            <label style={{ fontSize: "10px", fontWeight: 700, color: activeOverride ? "#1e40af" : "#166534", display: "block", marginBottom: "2px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: "11px", color: activeOverride ? "#1e40af" : "#166534", fontWeight: 700 }}>
                               {activeOverride ? "✍️ Manually Selected Supplier:" : "💡 Recommended Supplier:"}
-                            </label>
-                            <select
-                              value={activeOverride ? activeOverride.supplierName : rec?.vendorName || ""}
-                              onChange={(e) => {
-                                const selectedName = e.target.value;
-                                if (selectedName !== (rec?.vendorName || "")) {
-                                  setOverrideModal({
-                                    itemRec,
-                                    targetSupplierName: selectedName,
-                                    reasonText: "",
-                                  });
-                                } else {
-                                  // Reset override if user selects AI recommended back
-                                  const copy = { ...overrides };
-                                  delete copy[itemRec.slNo];
-                                  setOverrides(copy);
-                                }
-                              }}
-                              style={{
-                                width: "100%",
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                padding: "3px 6px",
-                                borderRadius: "4px",
-                                border: `1px solid ${activeOverride ? "#3b82f6" : "#16a34a"}`,
-                                background: "#ffffff",
-                                color: "#1e293b",
-                                cursor: "pointer",
-                              }}
-                            >
-                              {itemRec.evaluations.map((ev) => (
-                                <option key={ev.vendorName} value={ev.vendorName}>
-                                  Rank #{ev.rank}: {ev.vendorName} (${ev.quotation?.unitRate}/unit - {ev.finalScore} pts) {ev.vendorName === rec?.vendorName ? " [AI Top Recommended]" : ""}
-                                </option>
-                              ))}
-                            </select>
+                            </span>
+                            <span style={{ fontSize: "10px", fontWeight: 700, background: activeOverride ? "#2563eb" : "#16a34a", color: "white", padding: "1px 5px", borderRadius: "3px" }}>
+                              Score {displaySupplier?.finalScore}/100
+                            </span>
                           </div>
 
-                          {/* Selected supplier info */}
-                          {displaySupplier && (
-                            <>
-                              <div style={{ fontSize: "11px", color: activeOverride ? "#1e40af" : "#166534", fontWeight: 600 }}>
-                                ${displaySupplier.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} / unit (${displaySupplier.quotation?.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })} Total)
-                              </div>
+                          <div style={{ fontSize: "13px", fontWeight: 700, color: activeOverride ? "#1e40af" : "#15803d", marginTop: "3px" }}>
+                            {displaySupplier?.vendorName}
+                          </div>
 
-                              {activeOverride ? (
-                                <div style={{ marginTop: "6px", fontSize: "10px", color: "#1e40af", borderTop: "1px dashed #bfdbfe", paddingTop: "4px" }}>
-                                  <strong>📝 Audit Reason Note:</strong>
-                                  <div style={{ marginTop: "2px", fontStyle: "italic", background: "#ffffff", padding: "4px 6px", borderRadius: "3px", border: "1px solid #dbeafe" }}>
-                                    "{activeOverride.auditReason}"
-                                  </div>
-                                </div>
-                              ) : (
-                                <div style={{ marginTop: "6px", fontSize: "10px", color: "#15803d", borderTop: "1px dashed #bbf7d0", paddingTop: "4px" }}>
-                                  <strong>Key Reasons:</strong>
-                                  <ul style={{ margin: "2px 0 0 12px", padding: 0 }}>
-                                    {rec?.reasonsForSelection.slice(0, 2).map((r, idx) => (
-                                      <li key={idx}>{r}</li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-                            </>
+                          <div style={{ fontSize: "11px", color: activeOverride ? "#1e40af" : "#166534", marginTop: "1px", fontWeight: 600 }}>
+                            ${displaySupplier?.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} / unit (${displaySupplier?.quotation?.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })} Total)
+                          </div>
+
+                          {activeOverride ? (
+                            <div style={{ marginTop: "6px", fontSize: "10px", color: "#1e40af", borderTop: "1px dashed #bfdbfe", paddingTop: "4px" }}>
+                              <strong>📝 Mandatory Audit Reason Note:</strong>
+                              <div style={{ marginTop: "2px", fontStyle: "italic", background: "#ffffff", padding: "4px 6px", borderRadius: "3px", border: "1px solid #dbeafe" }}>
+                                "{activeOverride.auditReason}"
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ marginTop: "6px", fontSize: "10px", color: "#15803d", borderTop: "1px dashed #bbf7d0", paddingTop: "4px" }}>
+                              <strong>Key Reasons:</strong>
+                              <ul style={{ margin: "2px 0 0 12px", padding: 0 }}>
+                                {rec?.reasonsForSelection.slice(0, 2).map((r, idx) => (
+                                  <li key={idx}>{r}</li>
+                                ))}
+                              </ul>
+                            </div>
                           )}
                         </div>
                       )}
