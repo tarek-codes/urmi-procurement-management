@@ -108,7 +108,7 @@ export default function CSDetailView({ report, onBack }: Props) {
               <line x1="3" y1="9" x2="21" y2="9" />
               <line x1="9" y1="21" x2="9" y2="9" />
             </svg>
-            6-Metric Weighted Supplier Scoring & Itemwise Recommendations ({itemRecommendations.length} Items)
+            Items & Suppliers List ({itemRecommendations.length} Items)
           </div>
           <div style={{ display: "flex", gap: "12px", fontSize: "11px", fontWeight: 500 }}>
             <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
