@@ -127,15 +127,6 @@ export default function FraudAnalyzerPage() {
                   procurer: proc,
                 });
               }
-              if (q.totalPrice) {
-                items.push({
-                  amount: q.totalPrice,
-                  label: `${doc.csNo} - ${it.itemName} (${q.supplierName})`,
-                  context: `Total Price: $${q.totalPrice}`,
-                  company: comp,
-                  procurer: proc,
-                });
-              }
             });
           });
         });
