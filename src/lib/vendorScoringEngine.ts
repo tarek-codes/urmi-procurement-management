@@ -268,34 +268,63 @@ export function evaluateItemVendorRecommendations(
           reasonsForSelection.push(`Highest overall composite score (${ev.finalScore}/100) balancing price competitiveness with supplier trust & delivery.`);
         }
       } else {
-        // Reasons why NOT selected for non-recommended suppliers
+        // Dynamic multi-metric reasons why NOT selected for non-recommended suppliers
         if (ev.quotation && topEv.quotation && ev.quotation.unitRate > topEv.quotation.unitRate) {
           const diffPct = (
             ((ev.quotation.unitRate - topEv.quotation.unitRate) / topEv.quotation.unitRate) *
             100
           ).toFixed(1);
-          reasonsAgainstSelection.push(`Quotation ($${ev.quotation.unitRate.toLocaleString()}) is ${diffPct}% higher than recommended supplier.`);
+          reasonsAgainstSelection.push(`Quotation ($${ev.quotation.unitRate.toLocaleString()}) is ${diffPct}% higher than recommended supplier ($${topEv.quotation.unitRate.toLocaleString()}).`);
         } else if (ev.quotation && topEv.quotation && ev.quotation.unitRate < topEv.quotation.unitRate) {
-          reasonsAgainstSelection.push(`Quoted lower rate ($${ev.quotation.unitRate.toLocaleString()}), but has lower supplier trust & historical delivery performance.`);
+          reasonsAgainstSelection.push(`Quoted lower rate ($${ev.quotation.unitRate.toLocaleString()}), but overall composite score is lower due to performance metrics.`);
         }
 
-        if (ev.metrics.trustScore < topEv.metrics.trustScore - 15) {
-          reasonsAgainstSelection.push(`Lower supplier trust / organizational relationship score (${ev.metrics.trustScore} vs ${topEv.metrics.trustScore}).`);
+        // 1. Current Price Score (30%)
+        if (ev.metrics.currentPriceScore < topEv.metrics.currentPriceScore - 5) {
+          const gap = ((topEv.metrics.currentPriceScore - ev.metrics.currentPriceScore) * 0.30).toFixed(2);
+          reasonsAgainstSelection.push(`Price Score Deficit: Lost ${gap} points out of 30 due to higher unit price.`);
         }
-        if (ev.metrics.winRateScore < topEv.metrics.winRateScore - 15) {
-          reasonsAgainstSelection.push(`Lower historical win rate for this item.`);
+
+        // 2. Supplier Trust & Loyalty (20%)
+        if (ev.metrics.trustScore < topEv.metrics.trustScore - 5) {
+          const gap = ((topEv.metrics.trustScore - ev.metrics.trustScore) * 0.20).toFixed(2);
+          reasonsAgainstSelection.push(`Trust & Loyalty Deficit: Lower organizational relationship score (${ev.metrics.trustScore.toFixed(1)} vs ${topEv.metrics.trustScore.toFixed(1)}, -${gap}/20 pts).`);
+        } else if (ev.metrics.trustScore < 60) {
+          reasonsAgainstSelection.push(`Low Supplier Trust: Moderate relationship history with procurement (${ev.metrics.trustScore.toFixed(1)}/100).`);
         }
-        if (ev.metrics.deliveryScore < topEv.metrics.deliveryScore - 15) {
-          reasonsAgainstSelection.push(`Slower average delivery lead times.`);
+
+        // 3. Price Consistency (15%)
+        if (ev.metrics.consistencyScore < topEv.metrics.consistencyScore - 5) {
+          const gap = ((topEv.metrics.consistencyScore - ev.metrics.consistencyScore) * 0.15).toFixed(2);
+          reasonsAgainstSelection.push(`Price Volatility: Higher historical price fluctuations (-${gap}/15 pts).`);
+        } else if (ev.metrics.consistencyScore < 75) {
+          reasonsAgainstSelection.push(`Inconsistent Pricing: Historical PO rates show noticeable variance (${ev.metrics.consistencyScore.toFixed(1)}/100).`);
         }
-        if (ev.metrics.consistencyScore < topEv.metrics.consistencyScore - 15) {
-          reasonsAgainstSelection.push(`Greater price fluctuations across historical purchase orders.`);
+
+        // 4. Item Experience (15%)
+        if (ev.metrics.experienceScore < topEv.metrics.experienceScore - 5) {
+          const gap = ((topEv.metrics.experienceScore - ev.metrics.experienceScore) * 0.15).toFixed(2);
+          reasonsAgainstSelection.push(`Item Experience Gap: Fewer past orders supplied for this item (${ev.metrics.experienceScore.toFixed(1)} vs ${topEv.metrics.experienceScore.toFixed(1)}, -${gap}/15 pts).`);
+        } else if (ev.metrics.experienceScore < 60) {
+          reasonsAgainstSelection.push(`Limited Item Experience: Supplier has minimal historical PO record for this item (${ev.metrics.experienceScore.toFixed(1)}/100).`);
         }
-        if (ev.metrics.experienceScore < topEv.metrics.experienceScore - 20) {
-          reasonsAgainstSelection.push(`Less historical experience supplying this item.`);
+
+        // 5. Historical Win Rate (10%)
+        if (ev.metrics.winRateScore < topEv.metrics.winRateScore - 5) {
+          const gap = ((topEv.metrics.winRateScore - ev.metrics.winRateScore) * 0.10).toFixed(2);
+          reasonsAgainstSelection.push(`Lower Win Rate: Lower selection frequency for this item in past CS cycles (${ev.metrics.winRateScore.toFixed(1)}% vs ${topEv.metrics.winRateScore.toFixed(1)}%).`);
         }
-        if (reasonsAgainstSelection.length === 0) {
-          reasonsAgainstSelection.push(`Lower overall weighted score (${ev.finalScore}/100) compared to recommended supplier (${topEv.finalScore}/100).`);
+
+        // 6. Delivery Speed (10%)
+        if (ev.metrics.deliveryScore < topEv.metrics.deliveryScore - 5) {
+          const gap = ((topEv.metrics.deliveryScore - ev.metrics.deliveryScore) * 0.10).toFixed(2);
+          reasonsAgainstSelection.push(`Slower Delivery: Longer historical lead time to deliver goods (-${gap}/10 pts).`);
+        }
+
+        // Fallback if score is lower but no single metric has a > 5-point gap
+        if (reasonsAgainstSelection.length === 0 || (reasonsAgainstSelection.length === 1 && ev.quotation?.unitRate === topEv.quotation?.unitRate)) {
+          const scoreDiff = (topEv.finalScore - ev.finalScore).toFixed(2);
+          reasonsAgainstSelection.push(`Lower overall composite score (${ev.finalScore}/100 vs ${topEv.finalScore}/100, -${scoreDiff} overall pts).`);
         }
       }
 
