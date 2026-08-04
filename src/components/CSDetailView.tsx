@@ -170,7 +170,7 @@ export default function CSDetailView({ report, onBack }: Props) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
           <div>
             <h3 style={{ fontSize: "15px", fontWeight: 700, margin: 0, color: "#1e293b", display: "flex", alignItems: "center", gap: "6px" }}>
-              <span>🏆 CS Supplier Award & Selection</span>
+              <span>Please Select a Supplier</span>
             </h3>
             <p style={{ fontSize: "12px", color: "#64748b", margin: "2px 0 0 0" }}>
               Select <strong>one supplier</strong> for this Comparative Statement (CS {report.csNo}).
