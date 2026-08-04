@@ -51,7 +51,12 @@ export function evaluateItemVendorRecommendations(
   const globalTrustScores = computeGlobalTrustScores(historicalRecords);
 
   return items.map((item) => {
-    if (!item.quotations || item.quotations.length === 0) {
+    // Filter out corrupted/missing quotes where unit rate is 0
+    const validQuotations = (item.quotations ?? []).filter(
+      (q) => q.unitRate > 0
+    );
+
+    if (validQuotations.length === 0) {
       return {
         slNo: item.slNo,
         itemName: item.itemName,
@@ -62,6 +67,9 @@ export function evaluateItemVendorRecommendations(
         optimalTotalCost: 0,
       };
     }
+
+    // Work with valid quotes only for the rest of this item's evaluation
+    const itemWithValidQuotes = { ...item, quotations: validQuotations };
 
     // Filter historical records for this specific item (fuzzy match name or TS ID or item ID)
     const normItemName = item.itemName.toLowerCase().trim();
@@ -74,12 +82,12 @@ export function evaluateItemVendorRecommendations(
     });
 
     // 1. Metric 1: Current CS Price Competitiveness (30%)
-    const lowestCurrentQuote = Math.min(...item.quotations.map((q) => q.unitRate));
+    const lowestCurrentQuote = Math.min(...validQuotations.map((q) => q.unitRate));
 
     // 2. Metric 2: Historical Win Rate (10%) & Item Experience PO Counts (15%)
     const totalItemPOs = itemHistRecords.filter((r) => r.poNo || r.poQty > 0 || r.poRate > 0).length;
     const vendorItemPOCounts: Record<string, number> = {};
-    item.quotations.forEach((q) => {
+    validQuotations.forEach((q) => {
       const qSupplierLower = q.supplierName.toLowerCase().trim();
       const pos = itemHistRecords.filter(
         (r) =>
@@ -92,7 +100,7 @@ export function evaluateItemVendorRecommendations(
 
     // 3. Metric 3: Delivery Performance (10%)
     const vendorAvgDeliveries: Record<string, number> = {};
-    item.quotations.forEach((q) => {
+    validQuotations.forEach((q) => {
       const qSupplierLower = q.supplierName.toLowerCase().trim();
       const delRecords = itemHistRecords.filter(
         (r) =>
@@ -116,7 +124,7 @@ export function evaluateItemVendorRecommendations(
 
     // 4. Metric 4: Price Consistency (15%)
     const vendorCVs: Record<string, number> = {};
-    item.quotations.forEach((q) => {
+    validQuotations.forEach((q) => {
       const qSupplierLower = q.supplierName.toLowerCase().trim();
       const rates = itemHistRecords
         .filter(
@@ -164,7 +172,7 @@ export function evaluateItemVendorRecommendations(
     };
 
     // Evaluate each vendor
-    const rawEvaluations: Omit<VendorItemEvaluation, "rank">[] = item.quotations.map((q) => {
+    const rawEvaluations: Omit<VendorItemEvaluation, "rank">[] = validQuotations.map((q) => {
       const vName = q.supplierName;
 
       // 1. Current Price Score (30%)
