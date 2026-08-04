@@ -18,14 +18,15 @@ export default function CSDetailView({ report, onBack }: Props) {
   const { historicalRecords } = useValidation();
   const [activeModalItem, setActiveModalItem] = useState<ItemRecommendationResult | null>(null);
 
-  // Confirmed supplier selections keyed by item slNo (null means user hasn't confirmed yet)
-  const [selections, setSelections] = useState<
-    Record<number, { supplierName: string; auditReason: string; isRecommended: boolean }>
-  >({});
+  // Single confirmed CS supplier selection state for the entire CS
+  const [csSelection, setCsSelection] = useState<{
+    supplierName: string;
+    auditReason: string;
+    isRecommended: boolean;
+  } | null>(null);
 
-  // Confirmation/audit modal state
+  // Confirmation/audit modal state for CS supplier selection
   const [confirmModal, setConfirmModal] = useState<{
-    itemRec: ItemRecommendationResult;
     targetSupplierName: string;
     isRecommended: boolean;
     reasonText: string;
@@ -34,16 +35,61 @@ export default function CSDetailView({ report, onBack }: Props) {
   const failedRules = report.results.filter((r) => r.status === "failed");
   const passedRules = report.results.filter((r) => r.status === "passed");
 
-  // Compute 8-metric weighted recommendation engine results for all items in this CS
+  // Compute 6-metric weighted recommendation engine results for all items in this CS
   const itemRecommendations = useMemo(() => {
     return evaluateItemVendorRecommendations(report.items, historicalRecords);
   }, [report.items, historicalRecords]);
+
+  // Collect unique suppliers and calculate CS-wide aggregate metrics
+  const csSuppliersSummary = useMemo(() => {
+    const map = new Map<
+      string,
+      { supplierName: string; totalCost: number; totalScore: number; count: number; aiPickCount: number }
+    >();
+
+    itemRecommendations.forEach((itemRec) => {
+      itemRec.evaluations.forEach((ev) => {
+        const name = ev.vendorName;
+        const existing = map.get(name) || {
+          supplierName: name,
+          totalCost: 0,
+          totalScore: 0,
+          count: 0,
+          aiPickCount: 0,
+        };
+        existing.totalCost += ev.quotation?.totalPrice || 0;
+        existing.totalScore += ev.finalScore;
+        existing.count += 1;
+        if (ev.isRecommended) existing.aiPickCount += 1;
+        map.set(name, existing);
+      });
+    });
+
+    const list = Array.from(map.values()).map((s) => ({
+      ...s,
+      avgScore: Math.round((s.totalScore / (s.count || 1)) * 10) / 10,
+    }));
+
+    list.sort((a, b) => b.aiPickCount - a.aiPickCount || b.avgScore - a.avgScore);
+    const overallAiPick = list.length > 0 ? list[0].supplierName : null;
+
+    return { suppliers: list, overallAiPick };
+  }, [itemRecommendations]);
 
   // Overall recommended total cost across all items
   const totalRecommendedCost = itemRecommendations.reduce(
     (sum, item) => sum + item.optimalTotalCost,
     0
   );
+
+  // Total CS cost for the selected CS supplier
+  const totalSelectedCsCost = useMemo(() => {
+    if (!csSelection) return null;
+    return itemRecommendations.reduce((sum, itemRec) => {
+      const ev = itemRec.evaluations.find((e) => e.vendorName === csSelection.supplierName);
+      return sum + (ev?.quotation?.totalPrice || 0);
+    }, 0);
+  }, [csSelection, itemRecommendations]);
 
   return (
     <div className="detail-page">
@@ -73,9 +119,7 @@ export default function CSDetailView({ report, onBack }: Props) {
               style={{ marginLeft: 12, verticalAlign: "middle", fontSize: 13 }}
             >
               <span className="status-dot"></span>
-              {report.overallStatus === "passed"
-                ? "OK"
-                : "Review Needed"}
+              {report.overallStatus === "passed" ? "OK" : "Review Needed"}
             </span>
           </h1>
           <div className="detail-meta">
@@ -93,17 +137,150 @@ export default function CSDetailView({ report, onBack }: Props) {
             </div>
           </div>
         </div>
-        <div className="detail-stats">
+        <div className="detail-stats" style={{ display: "flex", gap: "12px" }}>
           <div className="detail-stat" style={{ background: "#f0fdf4", borderColor: "#bbf7d0" }}>
             <div className="detail-stat-value" style={{ color: "#15803d" }}>
               ${totalRecommendedCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </div>
             <div className="detail-stat-label" style={{ color: "#166534" }}>Recommended Total Cost</div>
           </div>
+          {csSelection && totalSelectedCsCost !== null && (
+            <div className="detail-stat" style={{ background: csSelection.isRecommended ? "#f0fdf4" : "#eff6ff", borderColor: csSelection.isRecommended ? "#bbf7d0" : "#bfdbfe" }}>
+              <div className="detail-stat-value" style={{ color: csSelection.isRecommended ? "#15803d" : "#1e40af" }}>
+                ${totalSelectedCsCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              </div>
+              <div className="detail-stat-label" style={{ color: csSelection.isRecommended ? "#166534" : "#1e40af" }}>
+                Awarded CS Total ({csSelection.supplierName})
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Items section on top */}
+      {/* CS Supplier Award & Selection Card */}
+      <div
+        style={{
+          background: csSelection ? (csSelection.isRecommended ? "#f0fdf4" : "#eff6ff") : "#f8fafc",
+          border: `1px solid ${csSelection ? (csSelection.isRecommended ? "#bbf7d0" : "#bfdbfe") : "#e2e8f0"}`,
+          borderRadius: "10px",
+          padding: "16px 20px",
+          marginBottom: "var(--space-xl)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+          <div>
+            <h3 style={{ fontSize: "15px", fontWeight: 700, margin: 0, color: "#1e293b", display: "flex", alignItems: "center", gap: "6px" }}>
+              <span>🏆 CS Supplier Award & Selection</span>
+            </h3>
+            <p style={{ fontSize: "12px", color: "#64748b", margin: "2px 0 0 0" }}>
+              Select <strong>one supplier</strong> for this Comparative Statement (CS {report.csNo}).
+            </p>
+          </div>
+          {csSelection && (
+            <button
+              onClick={() => setCsSelection(null)}
+              style={{
+                fontSize: "12px",
+                color: "#475569",
+                background: "#ffffff",
+                border: "1px solid #cbd5e1",
+                borderRadius: "6px",
+                padding: "4px 10px",
+                cursor: "pointer",
+                fontWeight: 600,
+              }}
+            >
+              Change CS Selection
+            </button>
+          )}
+        </div>
+
+        {/* Supplier Cards List for CS Selection */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "10px" }}>
+          {csSuppliersSummary.suppliers.map((sup) => {
+            const isSelected = csSelection?.supplierName === sup.supplierName;
+            const isOverallAiPick = csSuppliersSummary.overallAiPick === sup.supplierName;
+
+            return (
+              <div
+                key={sup.supplierName}
+                onClick={() => {
+                  setConfirmModal({
+                    targetSupplierName: sup.supplierName,
+                    isRecommended: isOverallAiPick,
+                    reasonText: isSelected ? csSelection?.auditReason || "" : "",
+                  });
+                }}
+                style={{
+                  background: isSelected
+                    ? (csSelection?.isRecommended ? "#dcfce7" : "#dbeafe")
+                    : "#ffffff",
+                  border: `2px solid ${
+                    isSelected
+                      ? (csSelection?.isRecommended ? "#16a34a" : "#2563eb")
+                      : isOverallAiPick
+                      ? "#86efac"
+                      : "#cbd5e1"
+                  }`,
+                  borderRadius: "8px",
+                  padding: "10px 14px",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  boxShadow: isSelected ? "0 2px 6px rgba(0,0,0,0.08)" : "none",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontWeight: 700, fontSize: "13px", color: "#1e293b" }}>
+                    {sup.supplierName}
+                  </span>
+                  {isSelected && (
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: csSelection?.isRecommended ? "#166534" : "#1e40af" }}>
+                      ✓ Selected
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
+                  <span>Total: <strong>${sup.totalCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong></span>
+                  <span>Avg: <strong>{sup.avgScore} pts</strong></span>
+                </div>
+
+                {isOverallAiPick && (
+                  <div style={{ marginTop: "6px" }}>
+                    <span style={{ fontSize: "10px", background: "#16a34a", color: "#ffffff", padding: "2px 6px", borderRadius: "4px", fontWeight: 700 }}>
+                      💡 Overall CS AI Pick ({sup.aiPickCount}/{itemRecommendations.length} Items)
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Selection Details */}
+        {csSelection ? (
+          <div style={{ marginTop: "12px", background: "#ffffff", padding: "10px 14px", borderRadius: "6px", border: "1px solid rgba(0,0,0,0.08)" }}>
+            <div style={{ fontSize: "12px", color: "#334155" }}>
+              <strong>Confirmed Awarded Supplier for CS:</strong>{" "}
+              <span style={{ color: csSelection.isRecommended ? "#15803d" : "#1e40af", fontWeight: 700 }}>
+                {csSelection.supplierName}
+              </span>
+              {" · "}Total CS Amount: <strong>${totalSelectedCsCost?.toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong>
+            </div>
+            {!csSelection.isRecommended && csSelection.auditReason && (
+              <div style={{ fontSize: "11px", color: "#1e40af", marginTop: "4px", fontStyle: "italic" }}>
+                <strong>📝 Mandatory Selection Reason Note:</strong> "{csSelection.auditReason}"
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ marginTop: "10px", fontSize: "11px", color: "#64748b", fontStyle: "italic", textAlign: "center" }}>
+            👆 Click a supplier card above or any bid card in the table below to select the supplier for this CS.
+          </div>
+        )}
+      </div>
+
+      {/* Items Section */}
       <div className="items-section" style={{ marginTop: 0, marginBottom: "var(--space-xl)" }}>
         <div className="section-title" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
@@ -121,12 +298,14 @@ export default function CSDetailView({ report, onBack }: Props) {
               <line x1="3" y1="9" x2="21" y2="9" />
               <line x1="9" y1="21" x2="9" y2="9" />
             </svg>
-            Items & Suppliers List ({itemRecommendations.length} Items)
+            Items & Bids Breakdown ({itemRecommendations.length} Items)
           </div>
           <div style={{ display: "flex", gap: "12px", fontSize: "11px", fontWeight: 500 }}>
             <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-              <span style={{ background: "#16a34a", color: "white", padding: "2px 8px", borderRadius: "4px", fontWeight: 700 }}>Rank #1 Recommended</span>
-              <span style={{ color: "var(--text-tertiary)" }}>(Highest Composite Score)</span>
+              <span style={{ background: "#16a34a", color: "white", padding: "2px 8px", borderRadius: "4px", fontWeight: 700 }}>
+                AI Pick
+              </span>
+              <span style={{ color: "var(--text-tertiary)" }}>(Highest Composite Score per Item)</span>
             </span>
           </div>
         </div>
@@ -138,17 +317,13 @@ export default function CSDetailView({ report, onBack }: Props) {
                 <th style={{ width: "40px" }}>#</th>
                 <th style={{ width: "220px" }}>Item Details</th>
                 <th>Itemwise Supplier Bids & Composite Score</th>
-                <th style={{ width: "240px" }}>Recommended Supplier & Reasons</th>
+                <th style={{ width: "260px" }}>Recommended Supplier & Reasons</th>
                 <th style={{ textAlign: "center", width: "110px" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {itemRecommendations.map((itemRec) => {
                 const rec = itemRec.recommendedVendor;
-                const confirmed = selections[itemRec.slNo];
-                const displaySupplier = confirmed
-                  ? itemRec.evaluations.find((e) => e.vendorName === confirmed.supplierName) || null
-                  : null;
 
                 return (
                   <tr key={itemRec.slNo}>
@@ -177,7 +352,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                     <td>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: "8px" }}>
                         {itemRec.evaluations.map((ev) => {
-                          const isConfirmed = confirmed?.supplierName === ev.vendorName;
+                          const isCsSelected = csSelection?.supplierName === ev.vendorName;
                           const isAiRec = ev.isRecommended;
 
                           let badgeStyle: React.CSSProperties = {
@@ -193,15 +368,14 @@ export default function CSDetailView({ report, onBack }: Props) {
                             outline: "none",
                           };
 
-                          if (isConfirmed) {
+                          if (isCsSelected) {
                             badgeStyle = {
                               ...badgeStyle,
-                              background: confirmed.isRecommended ? "#f0fdf4" : "#eff6ff",
-                              borderColor: confirmed.isRecommended ? "#16a34a" : "#3b82f6",
-                              boxShadow: `0 2px 5px ${confirmed.isRecommended ? "rgba(22, 163, 74, 0.2)" : "rgba(59, 130, 246, 0.25)"}`,
+                              background: csSelection?.isRecommended ? "#f0fdf4" : "#eff6ff",
+                              borderColor: csSelection?.isRecommended ? "#16a34a" : "#3b82f6",
+                              boxShadow: `0 2px 5px ${csSelection?.isRecommended ? "rgba(22, 163, 74, 0.2)" : "rgba(59, 130, 246, 0.25)"}`,
                             };
-                          } else if (isAiRec && !confirmed) {
-                            // Soft highlight AI recommended when nothing is selected yet
+                          } else if (isAiRec) {
                             badgeStyle = {
                               ...badgeStyle,
                               borderColor: "#bbf7d0",
@@ -213,23 +387,55 @@ export default function CSDetailView({ report, onBack }: Props) {
                             <div
                               key={ev.vendorName}
                               style={badgeStyle}
-                              title={`Click to select ${ev.vendorName}`}
+                              title={`Click to select ${ev.vendorName} for CS`}
                               onClick={() => {
+                                const isOverallAiPick = csSuppliersSummary.overallAiPick === ev.vendorName;
                                 setConfirmModal({
-                                  itemRec,
                                   targetSupplierName: ev.vendorName,
-                                  isRecommended: ev.isRecommended,
-                                  reasonText: confirmed?.supplierName === ev.vendorName ? confirmed.auditReason : "",
+                                  isRecommended: isOverallAiPick,
+                                  reasonText: isCsSelected ? csSelection?.auditReason || "" : "",
                                 });
                               }}
                             >
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "4px" }}>
-                                <span style={{ fontWeight: 700, fontSize: "12px", color: isConfirmed ? (confirmed.isRecommended ? "#15803d" : "#1e40af") : "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px", display: "flex", alignItems: "center", gap: "3px" }} title={ev.vendorName}>
+                                <span
+                                  style={{
+                                    fontWeight: 700,
+                                    fontSize: "12px",
+                                    color: isCsSelected
+                                      ? (csSelection?.isRecommended ? "#15803d" : "#1e40af")
+                                      : "var(--text-primary)",
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    maxWidth: "120px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                  }}
+                                  title={ev.vendorName}
+                                >
                                   {ev.vendorName}
-                                  {isAiRec && !confirmed && <span style={{ fontSize: "9px", background: "#dcfce7", color: "#166534", padding: "1px 4px", borderRadius: "3px", fontWeight: 600 }}>AI Pick</span>}
-                                  {isConfirmed && <span style={{ fontSize: "10px" }}>✓</span>}
+                                  {isAiRec && (
+                                    <span style={{ fontSize: "9px", background: "#dcfce7", color: "#166534", padding: "1px 4px", borderRadius: "3px", fontWeight: 700 }}>
+                                      AI Pick
+                                    </span>
+                                  )}
+                                  {isCsSelected && <span style={{ fontSize: "10px" }}>✓</span>}
                                 </span>
-                                <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", background: isConfirmed ? (confirmed.isRecommended ? "#16a34a" : "#2563eb") : "#64748b", color: "#ffffff", flexShrink: 0 }}>
+                                <span
+                                  style={{
+                                    fontSize: "10px",
+                                    fontWeight: 700,
+                                    padding: "2px 6px",
+                                    borderRadius: "4px",
+                                    background: isCsSelected
+                                      ? (csSelection?.isRecommended ? "#16a34a" : "#2563eb")
+                                      : "#64748b",
+                                    color: "#ffffff",
+                                    flexShrink: 0,
+                                  }}
+                                >
                                   {ev.finalScore} pts
                                 </span>
                               </div>
@@ -252,64 +458,39 @@ export default function CSDetailView({ report, onBack }: Props) {
                         <div style={{ background: "#fef2f2", border: "1px solid #fecaca", padding: "8px 10px", borderRadius: "6px" }}>
                           <span style={{ color: "#b91c1c", fontSize: "12px", fontWeight: 600 }}>⚠️ No supplier has quoted for this item</span>
                         </div>
-                      ) : itemRec.evaluations.length === 1 ? (
-                        <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "8px 10px", borderRadius: "6px" }}>
-                          <div style={{ fontSize: "11px", color: "#475569", fontWeight: 700 }}>ℹ️ Sole Bidder Offered:</div>
-                          <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e293b", marginTop: "2px" }}>
+                      ) : (
+                        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "8px 10px", borderRadius: "6px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: "11px", color: "#166534", fontWeight: 700 }}>
+                              💡 AI Recommended Item Supplier:
+                            </span>
+                            <span style={{ fontSize: "10px", fontWeight: 700, background: "#16a34a", color: "white", padding: "1px 5px", borderRadius: "3px" }}>
+                              {rec?.finalScore} pts
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: "13px", fontWeight: 700, color: "#15803d", marginTop: "3px" }}>
                             {rec?.vendorName}
                           </div>
-                          <div style={{ fontSize: "11px", color: "#64748b", marginTop: "1px" }}>
-                            ${rec?.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} / unit
-                          </div>
-                          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "4px", fontStyle: "italic" }}>
-                            Single supplier quote available — no competitive comparison required.
-                          </div>
-                        </div>
-                      ) : !confirmed ? (
-                        // Nothing selected yet
-                        <div style={{ background: "#fafafa", border: "1px dashed #cbd5e1", padding: "10px", borderRadius: "6px", textAlign: "center" }}>
-                          <div style={{ fontSize: "18px", marginBottom: "4px" }}>👆</div>
-                          <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>No supplier selected</div>
-                          <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "2px" }}>Click a supplier card on the left to select</div>
-                        </div>
-                      ) : (
-                        <div style={{ background: confirmed.isRecommended ? "#f0fdf4" : "#eff6ff", border: `1px solid ${confirmed.isRecommended ? "#bbf7d0" : "#bfdbfe"}`, padding: "8px 10px", borderRadius: "6px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ fontSize: "11px", color: confirmed.isRecommended ? "#166534" : "#1e40af", fontWeight: 700 }}>
-                              {confirmed.isRecommended ? "💡 AI Recommended:" : "✍️ Manually Selected:"}
-                            </span>
-                            <span style={{ fontSize: "10px", fontWeight: 700, background: confirmed.isRecommended ? "#16a34a" : "#2563eb", color: "white", padding: "1px 5px", borderRadius: "3px" }}>
-                              {displaySupplier?.finalScore} pts
-                            </span>
+
+                          <div style={{ fontSize: "11px", color: "#166534", marginTop: "1px", fontWeight: 600 }}>
+                            ${rec?.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}/unit · ${rec?.quotation?.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })} total
                           </div>
 
-                          <div style={{ fontSize: "13px", fontWeight: 700, color: confirmed.isRecommended ? "#15803d" : "#1e40af", marginTop: "3px" }}>
-                            {displaySupplier?.vendorName}
+                          <div style={{ marginTop: "6px", fontSize: "10px", color: "#15803d", borderTop: "1px dashed #bbf7d0", paddingTop: "4px" }}>
+                            <strong>Key Reasons:</strong>
+                            <ul style={{ margin: "2px 0 0 12px", padding: 0 }}>
+                              {rec?.reasonsForSelection.slice(0, 2).map((r, idx) => (
+                                <li key={idx}>{r}</li>
+                              ))}
+                            </ul>
                           </div>
 
-                          <div style={{ fontSize: "11px", color: confirmed.isRecommended ? "#166534" : "#1e40af", marginTop: "1px", fontWeight: 600 }}>
-                            ${displaySupplier?.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}/unit · ${displaySupplier?.quotation?.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })} total
-                          </div>
-
-                          {!confirmed.isRecommended && confirmed.auditReason && (
-                            <div style={{ marginTop: "6px", fontSize: "10px", color: "#1e40af", borderTop: "1px dashed #bfdbfe", paddingTop: "4px" }}>
-                              <strong>📝 Audit Reason Note:</strong>
-                              <div style={{ marginTop: "2px", fontStyle: "italic", background: "#ffffff", padding: "4px 6px", borderRadius: "3px", border: "1px solid #dbeafe" }}>
-                                "{confirmed.auditReason}"
-                              </div>
+                          {csSelection && csSelection.supplierName !== rec?.vendorName && (
+                            <div style={{ marginTop: "6px", paddingTop: "4px", borderTop: "1px solid #dbeafe", fontSize: "10px", color: "#1e40af" }}>
+                              ✍️ CS Awarded to: <strong>{csSelection.supplierName}</strong>
                             </div>
                           )}
-
-                          <button
-                            onClick={() => {
-                              const copy = { ...selections };
-                              delete copy[itemRec.slNo];
-                              setSelections(copy);
-                            }}
-                            style={{ marginTop: "6px", fontSize: "10px", color: "#64748b", background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "underline" }}
-                          >
-                            Change selection
-                          </button>
                         </div>
                       )}
                     </td>
@@ -334,7 +515,7 @@ export default function CSDetailView({ report, onBack }: Props) {
         </div>
       </div>
 
-      {/* Modal / Drawer for 8-Metric Breakdown per Item */}
+      {/* Modal / Drawer for 6-Metric Breakdown per Item */}
       {activeModalItem && (
         <div
           style={{
@@ -386,36 +567,43 @@ export default function CSDetailView({ report, onBack }: Props) {
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              {activeModalItem.evaluations.map((ev) => (
-                <div
-                  key={ev.vendorName}
-                  style={{
-                    border: ev.isRecommended ? "2px solid #16a34a" : "1px solid var(--border)",
-                    borderRadius: "8px",
-                    padding: "16px",
-                    background: ev.isRecommended ? "#f0fdf4" : "var(--bg-card)",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-primary)" }}>
-                        {ev.vendorName}
-                      </span>
-                      {ev.isRecommended && (
-                        <span style={{ background: "#16a34a", color: "white", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: 700 }}>
-                          💡 RECOMMENDED SUPPLIER
+              {activeModalItem.evaluations.map((ev) => {
+                const isCsSelected = csSelection?.supplierName === ev.vendorName;
+
+                return (
+                  <div
+                    key={ev.vendorName}
+                    style={{
+                      border: ev.isRecommended ? "2px solid #16a34a" : "1px solid var(--border)",
+                      borderRadius: "8px",
+                      padding: "16px",
+                      background: ev.isRecommended ? "#f0fdf4" : "var(--bg-card)",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-primary)" }}>
+                          {ev.vendorName}
                         </span>
-                      )}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                      {activeModalItem.evaluations.length > 1 && (
+                        {ev.isRecommended && (
+                          <span style={{ background: "#16a34a", color: "white", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: 700 }}>
+                            💡 RECOMMENDED ITEM SUPPLIER
+                          </span>
+                        )}
+                        {isCsSelected && (
+                          <span style={{ background: "#2563eb", color: "white", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: 700 }}>
+                            ✓ CS AWARDED
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                         <button
                           onClick={() => {
+                            const isOverallAiPick = csSuppliersSummary.overallAiPick === ev.vendorName;
                             setConfirmModal({
-                              itemRec: activeModalItem,
                               targetSupplierName: ev.vendorName,
-                              isRecommended: ev.isRecommended,
-                              reasonText: selections[activeModalItem.slNo]?.supplierName === ev.vendorName ? selections[activeModalItem.slNo].auditReason : "",
+                              isRecommended: isOverallAiPick,
+                              reasonText: isCsSelected ? csSelection?.auditReason || "" : "",
                             });
                             setActiveModalItem(null);
                           }}
@@ -425,82 +613,82 @@ export default function CSDetailView({ report, onBack }: Props) {
                             fontWeight: 700,
                             borderRadius: "4px",
                             border: "none",
-                            background: selections[activeModalItem.slNo]?.supplierName === ev.vendorName ? "#16a34a" : "#2563eb",
+                            background: isCsSelected ? "#16a34a" : "#2563eb",
                             color: "#ffffff",
                             cursor: "pointer",
                           }}
                         >
-                          {selections[activeModalItem.slNo]?.supplierName === ev.vendorName ? "✓ Selected" : "Select Supplier"}
+                          {isCsSelected ? "✓ CS Selected" : "Select for CS"}
                         </button>
-                      )}
-                      <div style={{ fontSize: "16px", fontWeight: 800, color: ev.isRecommended ? "#15803d" : "var(--text-primary)" }}>
-                        Composite Score: {ev.finalScore} / 100
+                        <div style={{ fontSize: "16px", fontWeight: 800, color: ev.isRecommended ? "#15803d" : "var(--text-primary)" }}>
+                          Composite Score: {ev.finalScore} / 100
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* 6-Metric Weighted Scores Grid */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "12px" }}>
-                    <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
-                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Current Price (30%)</div>
-                      <div style={{ fontSize: "14px", fontWeight: 700 }}>
-                        {((ev.metrics.currentPriceScore * 0.30)).toFixed(2)} / 30
+                    {/* 6-Metric Weighted Scores Grid */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "12px" }}>
+                      <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Current Price (30%)</div>
+                        <div style={{ fontSize: "14px", fontWeight: 700 }}>
+                          {((ev.metrics.currentPriceScore * 0.30)).toFixed(2)} / 30
+                        </div>
+                      </div>
+                      <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Supplier Trust & Loyalty (32%)</div>
+                        <div style={{ fontSize: "14px", fontWeight: 700, color: "#15803d" }}>
+                          {((ev.metrics.trustScore * 0.32)).toFixed(2)} / 32
+                        </div>
+                      </div>
+                      <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Price Consistency (8%)</div>
+                        <div style={{ fontSize: "14px", fontWeight: 700 }}>
+                          {((ev.metrics.consistencyScore * 0.08)).toFixed(2)} / 8
+                        </div>
+                      </div>
+                      <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Item Experience (5%)</div>
+                        <div style={{ fontSize: "14px", fontWeight: 700 }}>
+                          {((ev.metrics.experienceScore * 0.05)).toFixed(2)} / 5
+                        </div>
+                      </div>
+                      <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Historical Win Rate (15%)</div>
+                        <div style={{ fontSize: "14px", fontWeight: 700 }}>
+                          {((ev.metrics.winRateScore * 0.15)).toFixed(2)} / 15
+                        </div>
+                      </div>
+                      <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
+                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Delivery Speed (10%)</div>
+                        <div style={{ fontSize: "14px", fontWeight: 700 }}>
+                          {((ev.metrics.deliveryScore * 0.10)).toFixed(2)} / 10
+                        </div>
                       </div>
                     </div>
-                    <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
-                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Supplier Trust & Loyalty (20%)</div>
-                      <div style={{ fontSize: "14px", fontWeight: 700, color: "#15803d" }}>
-                        {((ev.metrics.trustScore * 0.20)).toFixed(2)} / 20
-                      </div>
-                    </div>
-                    <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
-                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Price Consistency (15%)</div>
-                      <div style={{ fontSize: "14px", fontWeight: 700 }}>
-                        {((ev.metrics.consistencyScore * 0.15)).toFixed(2)} / 15
-                      </div>
-                    </div>
-                    <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
-                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Item Experience (15%)</div>
-                      <div style={{ fontSize: "14px", fontWeight: 700 }}>
-                        {((ev.metrics.experienceScore * 0.15)).toFixed(2)} / 15
-                      </div>
-                    </div>
-                    <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
-                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Historical Win Rate (10%)</div>
-                      <div style={{ fontSize: "14px", fontWeight: 700 }}>
-                        {((ev.metrics.winRateScore * 0.10)).toFixed(2)} / 10
-                      </div>
-                    </div>
-                    <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
-                      <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Delivery Speed (10%)</div>
-                      <div style={{ fontSize: "14px", fontWeight: 700 }}>
-                        {((ev.metrics.deliveryScore * 0.10)).toFixed(2)} / 10
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Reasons Breakdown */}
-                  {ev.isRecommended ? (
-                    <div style={{ fontSize: "12px", color: "#15803d", background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
-                      <strong>Why Recommended:</strong>
-                      <ul style={{ margin: "4px 0 0 16px", padding: 0 }}>
-                        {ev.reasonsForSelection.map((r, idx) => (
-                          <li key={idx}>{r}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: "12px", color: "#b91c1c", background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid #fecaca" }}>
-                      <strong>Reasons Why Not Selected:</strong>
-                      <ul style={{ margin: "4px 0 0 16px", padding: 0 }}>
-                        {ev.reasonsAgainstSelection.map((r, idx) => (
-                          <li key={idx}>{r}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    {/* Reasons Breakdown */}
+                    {ev.isRecommended ? (
+                      <div style={{ fontSize: "12px", color: "#15803d", background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid #bbf7d0" }}>
+                        <strong>Why Recommended:</strong>
+                        <ul style={{ margin: "4px 0 0 16px", padding: 0 }}>
+                          {ev.reasonsForSelection.map((r, idx) => (
+                            <li key={idx}>{r}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: "12px", color: "#b91c1c", background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid #fecaca" }}>
+                        <strong>Reasons Why Not Selected:</strong>
+                        <ul style={{ margin: "4px 0 0 16px", padding: 0 }}>
+                          {ev.reasonsAgainstSelection.map((r, idx) => (
+                            <li key={idx}>{r}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px" }}>
@@ -512,7 +700,7 @@ export default function CSDetailView({ report, onBack }: Props) {
         </div>
       )}
 
-      {/* Supplier Confirmation / Audit Modal */}
+      {/* Supplier Confirmation / Audit Modal for CS Selection */}
       {confirmModal && (
         <div
           style={{
@@ -547,10 +735,10 @@ export default function CSDetailView({ report, onBack }: Props) {
               <span style={{ fontSize: "26px" }}>{confirmModal.isRecommended ? "💡" : "✍️"}</span>
               <div>
                 <h3 style={{ fontSize: "17px", fontWeight: 700, margin: 0, color: "#1e293b" }}>
-                  {confirmModal.isRecommended ? "Confirm AI Recommended Supplier" : "Select Non-Recommended Supplier"}
+                  {confirmModal.isRecommended ? "Confirm AI Recommended CS Supplier" : "Select Non-Recommended CS Supplier"}
                 </h3>
                 <p style={{ fontSize: "12px", color: "#64748b", margin: "2px 0 0 0" }}>
-                  Item: <strong>{confirmModal.itemRec.itemName}</strong>
+                  Awarding Comparative Statement: <strong>{report.csNo}</strong>
                 </p>
               </div>
             </div>
@@ -568,7 +756,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                 fontWeight: 600,
               }}
             >
-              {confirmModal.isRecommended ? "✓ AI Recommended:" : "Selecting:"}{" "}
+              {confirmModal.isRecommended ? "✓ AI Recommended CS Supplier:" : "Selected CS Supplier:"}{" "}
               <strong>{confirmModal.targetSupplierName}</strong>
             </div>
 
@@ -582,7 +770,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                 <textarea
                   value={confirmModal.reasonText}
                   onChange={(e) => setConfirmModal({ ...confirmModal, reasonText: e.target.value })}
-                  placeholder="e.g. Urgent delivery required within 24h, specific brand approved by department head, lower total cost after negotiation..."
+                  placeholder="e.g. Supplier offers single-source procurement convenience, urgent delivery timeline, consolidated shipping rates..."
                   rows={4}
                   style={{
                     width: "100%",
@@ -618,13 +806,10 @@ export default function CSDetailView({ report, onBack }: Props) {
                 disabled={!confirmModal.isRecommended && !confirmModal.reasonText.trim()}
                 onClick={() => {
                   if (!confirmModal.isRecommended && !confirmModal.reasonText.trim()) return;
-                  setSelections({
-                    ...selections,
-                    [confirmModal.itemRec.slNo]: {
-                      supplierName: confirmModal.targetSupplierName,
-                      auditReason: confirmModal.reasonText.trim(),
-                      isRecommended: confirmModal.isRecommended,
-                    },
+                  setCsSelection({
+                    supplierName: confirmModal.targetSupplierName,
+                    auditReason: confirmModal.reasonText.trim(),
+                    isRecommended: confirmModal.isRecommended,
                   });
                   setConfirmModal(null);
                 }}
@@ -642,7 +827,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                   transition: "background 0.15s",
                 }}
               >
-                {confirmModal.isRecommended ? "✓ Confirm Selection" : "Confirm & Save Audit Note"}
+                {confirmModal.isRecommended ? "✓ Confirm CS Selection" : "Confirm & Save Audit Note"}
               </button>
             </div>
           </div>
