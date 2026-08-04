@@ -201,12 +201,6 @@ export default function CSDetailView({ report, onBack }: Props) {
                                 </span>
                               </div>
 
-                              {/* Reasons why NOT selected for non-rank-1 vendors */}
-                              {!isRec && ev.reasonsAgainstSelection.length > 0 && (
-                                <div style={{ fontSize: "10px", color: "#b91c1c", background: "#fef2f2", padding: "4px 6px", borderRadius: "4px", border: "1px solid #fecaca", marginTop: "2px" }}>
-                                  ⚠️ <strong>Why not picked:</strong> {ev.reasonsAgainstSelection[0]}
-                                </div>
-                              )}
                             </div>
                           );
                         })}
