@@ -19,10 +19,11 @@ export default function CSTable({ onSelectCS }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
   const [companyFilter, setCompanyFilter] = useState("");
   const [procurerFilter, setProcurerFilter] = useState("");
+  const [itemCountFilter, setItemCountFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   // Sort state
-  const [sortField, setSortField] = useState<SortField>("csDate");
+  const [sortField, setSortField] = useState<SortField | "itemCount">("csDate");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
 
   // Pagination state
@@ -32,9 +33,9 @@ export default function CSTable({ onSelectCS }: Props) {
   // Reset page to 1 when filters or sort change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, companyFilter, procurerFilter, statusFilter, sortField, sortOrder]);
+  }, [searchTerm, companyFilter, procurerFilter, itemCountFilter, statusFilter, sortField, sortOrder]);
 
-  // Extract unique companies and procurers for dropdown filters
+  // Extract unique companies, procurers, and item counts for dropdown filters
   const uniqueCompanies = useMemo(() => {
     const companies = new Set(reports.map((r) => r.companyName).filter(Boolean));
     return Array.from(companies).sort();
@@ -45,13 +46,18 @@ export default function CSTable({ onSelectCS }: Props) {
     return Array.from(procurers).sort();
   }, [reports]);
 
+  const uniqueItemCounts = useMemo(() => {
+    const counts = new Set(reports.map((r) => r.items.length));
+    return Array.from(counts).sort((a, b) => a - b);
+  }, [reports]);
+
   // Handle column header clicks for sorting
-  const handleSort = (field: SortField) => {
+  const handleSort = (field: SortField | "itemCount") => {
     if (sortField === field) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortOrder("desc"); // Default to descending for new fields (like errors/warnings)
+      setSortOrder("desc");
     }
   };
 
@@ -74,7 +80,17 @@ export default function CSTable({ onSelectCS }: Props) {
           return false;
         }
 
-        // General search term (matches CS No, Company, Requisition, Procurer, or Date)
+        // Item count filter
+        if (itemCountFilter) {
+          if (itemCountFilter.startsWith(">=")) {
+            const min = parseInt(itemCountFilter.replace(">=", ""), 10);
+            if (r.items.length < min) return false;
+          } else if (parseInt(itemCountFilter, 10) !== r.items.length) {
+            return false;
+          }
+        }
+
+        // General search term
         if (searchTerm.trim()) {
           const term = searchTerm.toLowerCase();
           const matches =
@@ -90,6 +106,12 @@ export default function CSTable({ onSelectCS }: Props) {
         return true;
       })
       .sort((a, b) => {
+        if (sortField === "itemCount") {
+          const valA = a.items.length;
+          const valB = b.items.length;
+          return sortOrder === "asc" ? valA - valB : valB - valA;
+        }
+
         let valA: string | number = a[sortField];
         let valB: string | number = b[sortField];
 
@@ -109,6 +131,7 @@ export default function CSTable({ onSelectCS }: Props) {
     statusFilter,
     companyFilter,
     procurerFilter,
+    itemCountFilter,
     searchTerm,
     sortField,
     sortOrder,
@@ -126,11 +149,16 @@ export default function CSTable({ onSelectCS }: Props) {
     setSearchTerm("");
     setCompanyFilter("");
     setProcurerFilter("");
+    setItemCountFilter("");
     setStatusFilter("all");
   };
 
   const hasActiveFilters =
-    searchTerm || companyFilter || procurerFilter || statusFilter !== "all";
+    Boolean(searchTerm) ||
+    Boolean(companyFilter) ||
+    Boolean(procurerFilter) ||
+    Boolean(itemCountFilter) ||
+    statusFilter !== "all";
 
   return (
     <div className="table-section">
@@ -199,21 +227,38 @@ export default function CSTable({ onSelectCS }: Props) {
           </div>
 
           <div className="filter-group">
+            <label>Item Count</label>
+            <select
+              className="filter-select"
+              value={itemCountFilter}
+              onChange={(e) => setItemCountFilter(e.target.value)}
+            >
+              <option value="">All Item Counts</option>
+              {uniqueItemCounts.map((cnt) => (
+                <option key={cnt} value={String(cnt)}>
+                  {cnt} {cnt === 1 ? "Item" : "Items"}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="filter-group">
             <label>Sort By</label>
             <select
               className="filter-select"
               value={`${sortField}-${sortOrder}`}
               onChange={(e) => {
-                const [field, order] = e.target.value.split("-") as [
-                  SortField,
-                  SortOrder
-                ];
+                const parts = e.target.value.split("-");
+                const field = parts[0] as SortField | "itemCount";
+                const order = parts[1] as SortOrder;
                 setSortField(field);
                 setSortOrder(order);
               }}
             >
               <option value="csDate-desc">Date (Newest First)</option>
               <option value="csDate-asc">Date (Oldest First)</option>
+              <option value="itemCount-desc">Items Count (Highest First)</option>
+              <option value="itemCount-asc">Items Count (Lowest First)</option>
               <option value="errorCount-desc">Errors (Highest First)</option>
               <option value="warningCount-desc">Warnings (Highest First)</option>
               <option value="csNo-asc">CS Number (A-Z)</option>
@@ -272,6 +317,9 @@ export default function CSTable({ onSelectCS }: Props) {
               <th onClick={() => handleSort("csDate")} className="sortable-th">
                 Date {sortField === "csDate" && (sortOrder === "asc" ? "▲" : "▼")}
               </th>
+              <th onClick={() => handleSort("itemCount")} className="sortable-th">
+                Items {sortField === "itemCount" && (sortOrder === "asc" ? "▲" : "▼")}
+              </th>
               <th>Status</th>
               <th onClick={() => handleSort("errorCount")} className="sortable-th">
                 Errors {sortField === "errorCount" && (sortOrder === "asc" ? "▲" : "▼")}
@@ -285,7 +333,7 @@ export default function CSTable({ onSelectCS }: Props) {
           <tbody>
             {paginatedReports.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ textAlign: "center", padding: "32px", color: "var(--text-tertiary)" }}>
+                <td colSpan={10} style={{ textAlign: "center", padding: "32px", color: "var(--text-tertiary)" }}>
                   No Comparative Statements match your current filters.
                 </td>
               </tr>
@@ -302,6 +350,7 @@ export default function CSTable({ onSelectCS }: Props) {
                   <td>{report.requisitionNo}</td>
                   <td className="td-procurer">{report.procurer}</td>
                   <td style={{ whiteSpace: "nowrap" }}>{report.csDate}</td>
+                  <td style={{ textAlign: "center", fontWeight: 600 }}>{report.items.length}</td>
                   <td>
                     {report.results.some((r) => r.ruleId === 4 && r.message.startsWith("No Supplier")) ? (
                       <span className="status-badge failed" style={{ background: "#fef2f2", color: "#dc2626", borderColor: "#fecaca" }}>
