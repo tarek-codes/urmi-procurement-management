@@ -2,15 +2,19 @@
 
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { CSValidationReport } from "@/lib/types";
+import { HistoricalRecord } from "@/lib/historicalTypes";
 import { parseExcelFile } from "@/lib/excelParser";
+import { parseHistoricalFile } from "@/lib/historicalParser";
 import { validateAllCS } from "@/lib/validator";
 
 interface ValidationContextType {
   reports: CSValidationReport[];
-  fileName: string | null;
+  historicalRecords: HistoricalRecord[];
+  csFileName: string | null;
+  histFileName: string | null;
   isProcessing: boolean;
   error: string | null;
-  processFile: (file: File) => Promise<void>;
+  processFiles: (csFile: File, histFile: File) => Promise<void>;
   clearData: () => void;
   getReportById: (id: string) => CSValidationReport | undefined;
 }
@@ -23,35 +27,50 @@ export function ValidationProvider({
   children: React.ReactNode;
 }) {
   const [reports, setReports] = useState<CSValidationReport[]>([]);
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [historicalRecords, setHistoricalRecords] = useState<HistoricalRecord[]>([]);
+  const [csFileName, setCsFileName] = useState<string | null>(null);
+  const [histFileName, setHistFileName] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const processFile = useCallback(async (file: File) => {
+  const processFiles = useCallback(async (csFile: File, histFile: File) => {
     setIsProcessing(true);
     setError(null);
 
     try {
-      const buffer = await file.arrayBuffer();
-      const documents = parseExcelFile(buffer);
+      // Parse both files in parallel
+      const [csBuffer, histBuffer] = await Promise.all([
+        csFile.arrayBuffer(),
+        histFile.arrayBuffer(),
+      ]);
 
+      const documents = parseExcelFile(csBuffer);
       if (documents.length === 0) {
-        setError("No valid CS data found in the uploaded file.");
+        setError("No valid CS data found in the CS file.");
         setReports([]);
-        setFileName(null);
+        setCsFileName(null);
+        setHistFileName(null);
+        return;
+      }
+
+      const parsedHistorical = parseHistoricalFile(histBuffer);
+      if (parsedHistorical.length === 0) {
+        setError("No valid historical records found in the historical file.");
         return;
       }
 
       const validationReports = validateAllCS(documents);
       setReports(validationReports);
-      setFileName(file.name);
+      setHistoricalRecords(parsedHistorical);
+      setCsFileName(csFile.name);
+      setHistFileName(histFile.name);
     } catch (err) {
-      console.error("Error processing file:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to process the file."
-      );
+      console.error("Error processing files:", err);
+      setError(err instanceof Error ? err.message : "Failed to process the files.");
       setReports([]);
-      setFileName(null);
+      setHistoricalRecords([]);
+      setCsFileName(null);
+      setHistFileName(null);
     } finally {
       setIsProcessing(false);
     }
@@ -59,7 +78,9 @@ export function ValidationProvider({
 
   const clearData = useCallback(() => {
     setReports([]);
-    setFileName(null);
+    setHistoricalRecords([]);
+    setCsFileName(null);
+    setHistFileName(null);
     setError(null);
   }, []);
 
@@ -72,10 +93,12 @@ export function ValidationProvider({
     <ValidationContext.Provider
       value={{
         reports,
-        fileName,
+        historicalRecords,
+        csFileName,
+        histFileName,
         isProcessing,
         error,
-        processFile,
+        processFiles,
         clearData,
         getReportById,
       }}

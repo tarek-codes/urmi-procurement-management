@@ -1,10 +1,15 @@
 "use client";
 
 import React, { useCallback, useRef, useState } from "react";
-import { useValidation } from "@/context/ValidationContext";
 
-export default function FileUpload() {
-  const { processFile, isProcessing } = useValidation();
+interface Props {
+  onFile: (file: File) => void;
+  isProcessing?: boolean;
+  label?: string;
+  hint?: string;
+}
+
+export default function FileUpload({ onFile, isProcessing = false, label, hint }: Props) {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -15,9 +20,9 @@ export default function FileUpload() {
         alert("Please upload an Excel file (.xlsx or .xls)");
         return;
       }
-      processFile(file);
+      onFile(file);
     },
-    [processFile]
+    [onFile]
   );
 
   const onDrop = useCallback(
@@ -88,17 +93,14 @@ export default function FileUpload() {
         {isProcessing ? (
           <>
             <div className="upload-title">Processing file…</div>
-            <div className="upload-hint">
-              Parsing Excel and running validations
-            </div>
+            <div className="upload-hint">Parsing Excel and running validations</div>
           </>
         ) : (
           <>
             <div className="upload-title">
-              Drop your CS Excel file here, or{" "}
-              <span style={{ color: "var(--accent)" }}>browse</span>
+              {label || <>Drop your Excel file here, or <span style={{ color: "var(--accent)" }}>browse</span></>}
             </div>
-            <div className="upload-hint">Supports .xlsx and .xls files</div>
+            <div className="upload-hint">{hint || "Supports .xlsx and .xls files"}</div>
           </>
         )}
       </div>

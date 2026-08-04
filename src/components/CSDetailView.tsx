@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { CSValidationReport, ValidationResult } from "@/lib/types";
-import { useHistorical } from "@/context/HistoricalContext";
+import { useValidation } from "@/context/ValidationContext";
 import {
   evaluateItemVendorRecommendations,
   ItemRecommendationResult,
@@ -15,7 +15,7 @@ interface Props {
 }
 
 export default function CSDetailView({ report, onBack }: Props) {
-  const { records: historicalRecords } = useHistorical();
+  const { historicalRecords } = useValidation();
   const [activeModalItem, setActiveModalItem] = useState<ItemRecommendationResult | null>(null);
 
   // Manual supplier selection overrides state keyed by item slNo
