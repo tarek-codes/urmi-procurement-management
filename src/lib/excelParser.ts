@@ -156,9 +156,6 @@ function extractQuotations(row: Record<string, unknown>): SupplierQuotation[] {
       ? getVal("SUPPLIER_NAME_1", "SUPPLIER_NAME", "SUPPLIER_1", "VENDOR_NAME_1", "VENDOR_1")
       : getVal(`SUPPLIER_NAME_${i}`, `SUPPLIER_${i}`, `VENDOR_NAME_${i}`, `VENDOR_${i}`);
 
-    const name = String(rawName || "").trim();
-    if (!name || name.toUpperCase() === "N/A" || name.toUpperCase() === "UNDEFINED") continue;
-
     const rawRate = i === 1
       ? getVal("UNIT_RATE_1", "UNIT_RATE", "RATE_1", "RATE")
       : getVal(`UNIT_RATE_${i}`, `RATE_${i}`, `UNIT_PRICE_${i}`, `PRICE_${i}`);
@@ -173,6 +170,15 @@ function extractQuotations(row: Record<string, unknown>): SupplierQuotation[] {
       ? getVal("TOTAL_PRICE_1", "TOTAL_PRICE", "TOTAL_1", "TOTAL", "AMOUNT_1")
       : getVal(`TOTAL_PRICE_${i}`, `TOTAL_AMOUNT_${i}`, `TOTAL_${i}`, `AMOUNT_${i}`);
     const totalPrice = parseNumeric(rawTotal) || (unitRate * quantity);
+
+    let name = String(rawName || "").trim();
+    
+    // If supplier name is blank but valid rate or total price exists (>0), generate fallback supplier label
+    if ((!name || name.toUpperCase() === "N/A" || name.toUpperCase() === "UNDEFINED") && (unitRate > 0 || totalPrice > 0)) {
+      name = `Supplier ${String.fromCharCode(64 + i)}`; // e.g. Supplier A, Supplier B, Supplier C
+    }
+
+    if (!name || name.toUpperCase() === "N/A" || name.toUpperCase() === "UNDEFINED") continue;
 
     quotations.push({
       supplierName: name,
