@@ -263,7 +263,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                           onClick={() => setActiveModalItem(itemRec)}
                           style={{ padding: "4px 8px", fontSize: "11px", whiteSpace: "nowrap" }}
                         >
-                          📊 View All 6 Metrics
+                          📊 See Reasoning
                         </button>
                       ) : (
                         <span style={{ color: "var(--text-tertiary)", fontSize: "11px" }}>—</span>
