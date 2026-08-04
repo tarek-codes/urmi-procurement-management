@@ -248,7 +248,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                 {isOverallAiPick && (
                   <div style={{ marginTop: "6px" }}>
                     <span style={{ fontSize: "10px", background: "#16a34a", color: "#ffffff", padding: "2px 6px", borderRadius: "4px", fontWeight: 700 }}>
-                      💡 Overall CS Top Supplier Pick ({sup.aiPickCount}/{itemRecommendations.length} Items)
+                      💡 Top Supplier Pick ({sup.aiPickCount}/{itemRecommendations.length} Items)
                     </span>
                   </div>
                 )}
