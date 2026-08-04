@@ -248,7 +248,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                 {isOverallAiPick && (
                   <div style={{ marginTop: "6px" }}>
                     <span style={{ fontSize: "10px", background: "#16a34a", color: "#ffffff", padding: "2px 6px", borderRadius: "4px", fontWeight: 700 }}>
-                      💡 Overall CS AI Pick ({sup.aiPickCount}/{itemRecommendations.length} Items)
+                      💡 Overall CS Top Supplier Pick ({sup.aiPickCount}/{itemRecommendations.length} Items)
                     </span>
                   </div>
                 )}
@@ -267,7 +267,7 @@ export default function CSDetailView({ report, onBack }: Props) {
               </span>
               {" · "}Total CS Amount: <strong>${totalSelectedCsCost?.toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong>
             </div>
-            {!csSelection.isRecommended && csSelection.auditReason && (
+            {csSelection.auditReason && (
               <div style={{ fontSize: "11px", color: "#1e40af", marginTop: "4px", fontStyle: "italic" }}>
                 <strong>📝 Mandatory Selection Reason Note:</strong> "{csSelection.auditReason}"
               </div>
@@ -303,7 +303,7 @@ export default function CSDetailView({ report, onBack }: Props) {
           <div style={{ display: "flex", gap: "12px", fontSize: "11px", fontWeight: 500 }}>
             <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               <span style={{ background: "#16a34a", color: "white", padding: "2px 8px", borderRadius: "4px", fontWeight: 700 }}>
-                AI Pick
+                Top Supplier Pick
               </span>
               <span style={{ color: "var(--text-tertiary)" }}>(Highest Composite Score per Item)</span>
             </span>
@@ -418,7 +418,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                                   {ev.vendorName}
                                   {isAiRec && (
                                     <span style={{ fontSize: "9px", background: "#dcfce7", color: "#166534", padding: "1px 4px", borderRadius: "3px", fontWeight: 700 }}>
-                                      AI Pick
+                                      Top Supplier Pick
                                     </span>
                                   )}
                                   {isCsSelected && <span style={{ fontSize: "10px" }}>✓</span>}
@@ -587,7 +587,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                         </span>
                         {ev.isRecommended && (
                           <span style={{ background: "#16a34a", color: "white", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: 700 }}>
-                            💡 RECOMMENDED ITEM SUPPLIER
+                            💡 RECOMMENDED TOP SUPPLIER PICK
                           </span>
                         )}
                         {isCsSelected && (
@@ -735,7 +735,7 @@ export default function CSDetailView({ report, onBack }: Props) {
               <span style={{ fontSize: "26px" }}>{confirmModal.isRecommended ? "💡" : "✍️"}</span>
               <div>
                 <h3 style={{ fontSize: "17px", fontWeight: 700, margin: 0, color: "#1e293b" }}>
-                  {confirmModal.isRecommended ? "Confirm AI Recommended CS Supplier" : "Select Non-Recommended CS Supplier"}
+                  Select CS Supplier
                 </h3>
                 <p style={{ fontSize: "12px", color: "#64748b", margin: "2px 0 0 0" }}>
                   Awarding Comparative Statement: <strong>{report.csNo}</strong>
@@ -756,45 +756,43 @@ export default function CSDetailView({ report, onBack }: Props) {
                 fontWeight: 600,
               }}
             >
-              {confirmModal.isRecommended ? "✓ AI Recommended CS Supplier:" : "Selected CS Supplier:"}{" "}
+              {confirmModal.isRecommended ? "✓ Top Supplier Pick:" : "Selected CS Supplier:"}{" "}
               <strong>{confirmModal.targetSupplierName}</strong>
             </div>
 
-            {/* Mandatory audit reason — only for non-recommended */}
-            {!confirmModal.isRecommended && (
-              <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#1e293b", marginBottom: "6px" }}>
-                  Selection Reason Note <span style={{ color: "#dc2626" }}>*</span>
-                  <span style={{ fontWeight: 400, color: "#64748b", marginLeft: "4px" }}>(required for audit trail)</span>
-                </label>
-                <textarea
-                  value={confirmModal.reasonText}
-                  onChange={(e) => setConfirmModal({ ...confirmModal, reasonText: e.target.value })}
-                  placeholder="e.g. Supplier offers single-source procurement convenience, urgent delivery timeline, consolidated shipping rates..."
-                  rows={4}
-                  style={{
-                    width: "100%",
-                    padding: "10px",
-                    fontSize: "13px",
-                    borderRadius: "6px",
-                    border: `1px solid ${confirmModal.reasonText.trim() ? "#93c5fd" : "#fca5a5"}`,
-                    outline: "none",
-                    fontFamily: "inherit",
-                    resize: "vertical",
-                    boxSizing: "border-box",
-                    transition: "border-color 0.15s",
-                  }}
-                />
-                {!confirmModal.reasonText.trim() && (
-                  <span style={{ fontSize: "11px", color: "#dc2626", marginTop: "4px", display: "block" }}>
-                    ⚠ A reason note is required to select a non-recommended supplier.
-                  </span>
-                )}
-              </div>
-            )}
+            {/* Mandatory audit reason — required for ALL selections */}
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#1e293b", marginBottom: "6px" }}>
+                Selection Reason Note <span style={{ color: "#dc2626" }}>*</span>
+                <span style={{ fontWeight: 400, color: "#64748b", marginLeft: "4px" }}>(required for audit trail)</span>
+              </label>
+              <textarea
+                value={confirmModal.reasonText}
+                onChange={(e) => setConfirmModal({ ...confirmModal, reasonText: e.target.value })}
+                placeholder="e.g. Lowest overall cost offered, preferred historical performance, approved sample quality..."
+                rows={4}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  fontSize: "13px",
+                  borderRadius: "6px",
+                  border: `1px solid ${confirmModal.reasonText.trim() ? "#93c5fd" : "#fca5a5"}`,
+                  outline: "none",
+                  fontFamily: "inherit",
+                  resize: "vertical",
+                  boxSizing: "border-box",
+                  transition: "border-color 0.15s",
+                }}
+              />
+              {!confirmModal.reasonText.trim() && (
+                <span style={{ fontSize: "11px", color: "#dc2626", marginTop: "4px", display: "block" }}>
+                  ⚠ A reason note is required for all supplier selections.
+                </span>
+              )}
+            </div>
 
             {/* Action buttons */}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: confirmModal.isRecommended ? "0" : undefined }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
               <button
                 className="btn-clear"
                 onClick={() => setConfirmModal(null)}
@@ -803,9 +801,9 @@ export default function CSDetailView({ report, onBack }: Props) {
                 Cancel
               </button>
               <button
-                disabled={!confirmModal.isRecommended && !confirmModal.reasonText.trim()}
+                disabled={!confirmModal.reasonText.trim()}
                 onClick={() => {
-                  if (!confirmModal.isRecommended && !confirmModal.reasonText.trim()) return;
+                  if (!confirmModal.reasonText.trim()) return;
                   setCsSelection({
                     supplierName: confirmModal.targetSupplierName,
                     auditReason: confirmModal.reasonText.trim(),
@@ -817,17 +815,17 @@ export default function CSDetailView({ report, onBack }: Props) {
                   padding: "8px 18px",
                   fontSize: "13px",
                   fontWeight: 700,
-                  background: (!confirmModal.isRecommended && !confirmModal.reasonText.trim())
+                  background: !confirmModal.reasonText.trim()
                     ? "#94a3b8"
-                    : confirmModal.isRecommended ? "#16a34a" : "#1e40af",
+                    : "#1e40af",
                   color: "#ffffff",
                   borderRadius: "7px",
                   border: "none",
-                  cursor: (!confirmModal.isRecommended && !confirmModal.reasonText.trim()) ? "not-allowed" : "pointer",
+                  cursor: !confirmModal.reasonText.trim() ? "not-allowed" : "pointer",
                   transition: "background 0.15s",
                 }}
               >
-                {confirmModal.isRecommended ? "✓ Confirm CS Selection" : "Confirm & Save Audit Note"}
+                Confirm & Save Selection Note
               </button>
             </div>
           </div>
