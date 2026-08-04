@@ -100,6 +100,7 @@ export interface CSValidationReport {
   warningCount: number;
   results: ValidationResult[];
   items: CSItem[];
+  suppliers: string[];
   csMainValue: number;
   calculatedTotal: number;
 }

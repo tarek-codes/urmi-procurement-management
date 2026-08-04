@@ -61,6 +61,7 @@ export function validateAllCS(documents: CSDocument[]): CSValidationReport[] {
       warningCount,
       results,
       items: doc.items,
+      suppliers: doc.suppliers,
       csMainValue: doc.csMainValue,
       calculatedTotal: doc.calculatedTotal,
     };

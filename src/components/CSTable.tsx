@@ -23,7 +23,7 @@ export default function CSTable({ onSelectCS }: Props) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   // Sort state
-  const [sortField, setSortField] = useState<SortField | "itemCount">("csDate");
+  const [sortField, setSortField] = useState<SortField | "itemCount" | "supplierCount">("csDate");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
 
   // Pagination state
@@ -52,7 +52,7 @@ export default function CSTable({ onSelectCS }: Props) {
   }, [reports]);
 
   // Handle column header clicks for sorting
-  const handleSort = (field: SortField | "itemCount") => {
+  const handleSort = (field: SortField | "itemCount" | "supplierCount") => {
     if (sortField === field) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
@@ -109,6 +109,11 @@ export default function CSTable({ onSelectCS }: Props) {
         if (sortField === "itemCount") {
           const valA = a.items.length;
           const valB = b.items.length;
+          return sortOrder === "asc" ? valA - valB : valB - valA;
+        }
+        if (sortField === "supplierCount") {
+          const valA = a.suppliers.length;
+          const valB = b.suppliers.length;
           return sortOrder === "asc" ? valA - valB : valB - valA;
         }
 
@@ -249,7 +254,7 @@ export default function CSTable({ onSelectCS }: Props) {
               value={`${sortField}-${sortOrder}`}
               onChange={(e) => {
                 const parts = e.target.value.split("-");
-                const field = parts[0] as SortField | "itemCount";
+                const field = parts[0] as SortField | "itemCount" | "supplierCount";
                 const order = parts[1] as SortOrder;
                 setSortField(field);
                 setSortOrder(order);
@@ -259,6 +264,8 @@ export default function CSTable({ onSelectCS }: Props) {
               <option value="csDate-asc">Date (Oldest First)</option>
               <option value="itemCount-desc">Items Count (Highest First)</option>
               <option value="itemCount-asc">Items Count (Lowest First)</option>
+              <option value="supplierCount-desc">Suppliers Count (Highest First)</option>
+              <option value="supplierCount-asc">Suppliers Count (Lowest First)</option>
               <option value="errorCount-desc">Errors (Highest First)</option>
               <option value="warningCount-desc">Warnings (Highest First)</option>
               <option value="csNo-asc">CS Number (A-Z)</option>
@@ -320,6 +327,9 @@ export default function CSTable({ onSelectCS }: Props) {
               <th onClick={() => handleSort("itemCount")} className="sortable-th">
                 Items {sortField === "itemCount" && (sortOrder === "asc" ? "▲" : "▼")}
               </th>
+              <th onClick={() => handleSort("supplierCount")} className="sortable-th">
+                Suppliers {sortField === "supplierCount" && (sortOrder === "asc" ? "▲" : "▼")}
+              </th>
               <th>Status</th>
               <th onClick={() => handleSort("errorCount")} className="sortable-th">
                 Errors {sortField === "errorCount" && (sortOrder === "asc" ? "▲" : "▼")}
@@ -333,7 +343,7 @@ export default function CSTable({ onSelectCS }: Props) {
           <tbody>
             {paginatedReports.length === 0 ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: "center", padding: "32px", color: "var(--text-tertiary)" }}>
+                <td colSpan={11} style={{ textAlign: "center", padding: "32px", color: "var(--text-tertiary)" }}>
                   No Comparative Statements match your current filters.
                 </td>
               </tr>
@@ -351,6 +361,7 @@ export default function CSTable({ onSelectCS }: Props) {
                   <td className="td-procurer">{report.procurer}</td>
                   <td style={{ whiteSpace: "nowrap" }}>{report.csDate}</td>
                   <td style={{ textAlign: "center", fontWeight: 600 }}>{report.items.length}</td>
+                  <td style={{ textAlign: "center", fontWeight: 600 }}>{report.suppliers.length}</td>
                   <td>
                     {report.results.some((r) => r.ruleId === 4 && r.message.startsWith("No Supplier")) ? (
                       <span className="status-badge failed" style={{ background: "#fef2f2", color: "#dc2626", borderColor: "#fecaca" }}>
