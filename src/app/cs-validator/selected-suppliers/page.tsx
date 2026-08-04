@@ -6,11 +6,35 @@ import { useValidation } from "@/context/ValidationContext";
 
 export default function SelectedSuppliersPage() {
   const { selectedSuppliers, updateAuditStatus } = useValidation();
+
+  // Audit password security state
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("audit_password_auth") === "true";
+    }
+    return false;
+  });
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "Pending" | "Approved" | "Rejected">("ALL");
 
   // Rejection modal state for auditor
   const [rejectModal, setRejectModal] = useState<{ id: string; csNo: string; note: string } | null>(null);
+
+  const handleVerifyPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordInput === "1234") {
+      setIsAuthenticated(true);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("audit_password_auth", "true");
+      }
+      setPasswordError(null);
+    } else {
+      setPasswordError("Invalid audit password. Access denied.");
+    }
+  };
 
   // Filtered records
   const filteredRecords = useMemo(() => {
@@ -37,7 +61,113 @@ export default function SelectedSuppliersPage() {
   }, [selectedSuppliers]);
 
   return (
-    <main className="page-container">
+    <main className="page-container" style={{ position: "relative" }}>
+      {/* Password Modal Overlay if not authenticated */}
+      {!isAuthenticated && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(15, 23, 42, 0.75)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "16px",
+          }}
+        >
+          <div
+            style={{
+              maxWidth: "400px",
+              width: "100%",
+              background: "#ffffff",
+              borderRadius: "14px",
+              padding: "28px",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.3)",
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: "36px", marginBottom: "12px" }}>🔒</div>
+            <h2 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 6px 0", color: "#1e293b" }}>
+              Auditor Access Required
+            </h2>
+            <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 20px 0" }}>
+              Enter the 4-digit Audit Password to access the Selected Suppliers Log.
+            </p>
+
+            <form onSubmit={handleVerifyPassword}>
+              <div style={{ marginBottom: "16px" }}>
+                <input
+                  type="password"
+                  value={passwordInput}
+                  onChange={(e) => {
+                    setPasswordInput(e.target.value);
+                    if (passwordError) setPasswordError(null);
+                  }}
+                  placeholder="Enter password (1234)"
+                  maxLength={10}
+                  autoFocus
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    fontSize: "16px",
+                    textAlign: "center",
+                    letterSpacing: "4px",
+                    borderRadius: "8px",
+                    border: `1px solid ${passwordError ? "#ef4444" : "#cbd5e1"}`,
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                />
+                {passwordError && (
+                  <div style={{ fontSize: "12px", color: "#ef4444", marginTop: "6px", fontWeight: 600 }}>
+                    ⚠️ {passwordError}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+                <Link
+                  href="/cs-validator"
+                  style={{
+                    padding: "10px 16px",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    borderRadius: "8px",
+                    border: "1px solid #cbd5e1",
+                    background: "#ffffff",
+                    color: "#475569",
+                    textDecoration: "none",
+                    display: "inline-block",
+                  }}
+                >
+                  Cancel
+                </Link>
+                <button
+                  type="submit"
+                  style={{
+                    padding: "10px 20px",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    borderRadius: "8px",
+                    border: "none",
+                    background: "#2563eb",
+                    color: "#ffffff",
+                    cursor: "pointer",
+                  }}
+                >
+                  Unlock Access
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Navigation breadcrumb */}
       <div style={{ marginBottom: "var(--space-md)" }}>
         <Link href="/" className="back-link" style={{ marginBottom: 0 }}>
