@@ -238,17 +238,23 @@ export default function CSDetailView({ report, onBack }: Props) {
                           </div>
                         </div>
                       ) : (
-                        <span style={{ color: "var(--text-tertiary)", fontSize: "12px" }}>No quotes available</span>
+                        <div style={{ background: "#fef3c7", border: "1px solid #fde68a", padding: "8px 10px", borderRadius: "6px" }}>
+                          <span style={{ color: "#92400e", fontSize: "12px", fontWeight: 600 }}>⚠️ No Bids / Quotations Entered</span>
+                        </div>
                       )}
                     </td>
                     <td style={{ textAlign: "center" }}>
-                      <button
-                        className="btn-reset-filters"
-                        onClick={() => setActiveModalItem(itemRec)}
-                        style={{ padding: "4px 8px", fontSize: "11px", whiteSpace: "nowrap" }}
-                      >
-                        📊 View All 8 Metrics
-                      </button>
+                      {rec ? (
+                        <button
+                          className="btn-reset-filters"
+                          onClick={() => setActiveModalItem(itemRec)}
+                          style={{ padding: "4px 8px", fontSize: "11px", whiteSpace: "nowrap" }}
+                        >
+                          📊 View All 6 Metrics
+                        </button>
+                      ) : (
+                        <span style={{ color: "var(--text-tertiary)", fontSize: "11px" }}>—</span>
+                      )}
                     </td>
                   </tr>
                 );
