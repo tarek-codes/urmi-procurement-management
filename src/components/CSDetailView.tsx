@@ -501,7 +501,7 @@ function ValidationItem({ result }: { result: ValidationResult }) {
 }
 
 function PassedRulesSection({ passedRules }: { passedRules: ValidationResult[] }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   return (
     <>
