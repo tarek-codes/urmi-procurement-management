@@ -303,10 +303,17 @@ export default function CSTable({ onSelectCS }: Props) {
                   <td className="td-procurer">{report.procurer}</td>
                   <td style={{ whiteSpace: "nowrap" }}>{report.csDate}</td>
                   <td>
-                    <span className={`status-badge ${report.overallStatus}`}>
-                      <span className="status-dot"></span>
-                      {report.overallStatus === "passed" ? "Passed" : "Review Needed"}
-                    </span>
+                    {report.results.some((r) => r.ruleId === 4 && r.message.startsWith("No Supplier")) ? (
+                      <span className="status-badge failed" style={{ background: "#fef2f2", color: "#dc2626", borderColor: "#fecaca" }}>
+                        <span className="status-dot" style={{ background: "#dc2626" }}></span>
+                        No Supplier Quotations
+                      </span>
+                    ) : (
+                      <span className={`status-badge ${report.overallStatus}`}>
+                        <span className="status-dot"></span>
+                        {report.overallStatus === "passed" ? "Passed" : "Review Needed"}
+                      </span>
+                    )}
                   </td>
                   <td>
                     <span className={`count-badge ${report.errorCount > 0 ? "error-count" : "zero"}`}>

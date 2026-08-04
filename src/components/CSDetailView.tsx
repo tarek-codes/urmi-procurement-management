@@ -213,33 +213,46 @@ export default function CSDetailView({ report, onBack }: Props) {
                       </div>
                     </td>
                     <td>
-                      {rec ? (
+                      {itemRec.evaluations.length === 0 ? (
+                        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", padding: "8px 10px", borderRadius: "6px" }}>
+                          <span style={{ color: "#b91c1c", fontSize: "12px", fontWeight: 600 }}>⚠️ No supplier has quoted for this CS</span>
+                        </div>
+                      ) : itemRec.evaluations.length === 1 ? (
+                        <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "8px 10px", borderRadius: "6px" }}>
+                          <div style={{ fontSize: "11px", color: "#475569", fontWeight: 700 }}>ℹ️ Sole Bidder Offered:</div>
+                          <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e293b", marginTop: "2px" }}>
+                            {rec?.vendorName}
+                          </div>
+                          <div style={{ fontSize: "11px", color: "#64748b", marginTop: "1px" }}>
+                            ${rec?.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} / unit
+                          </div>
+                          <div style={{ fontSize: "10px", color: "#64748b", marginTop: "4px", fontStyle: "italic" }}>
+                            Single supplier quote available — no competitive comparison required.
+                          </div>
+                        </div>
+                      ) : (
                         <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "8px 10px", borderRadius: "6px" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <span style={{ fontSize: "11px", color: "#166534", fontWeight: 700 }}>💡 Recommended Supplier:</span>
                             <span style={{ fontSize: "10px", fontWeight: 700, background: "#16a34a", color: "white", padding: "1px 5px", borderRadius: "3px" }}>
-                              Score {rec.finalScore}/100
+                              Score {rec?.finalScore}/100
                             </span>
                           </div>
                           <div style={{ fontSize: "13px", fontWeight: 700, color: "#15803d", marginTop: "3px" }}>
-                            {rec.vendorName}
+                            {rec?.vendorName}
                           </div>
                           <div style={{ fontSize: "11px", color: "#166534", marginTop: "1px", fontWeight: 600 }}>
-                            ${rec.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} / unit (${rec.quotation?.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })} Total)
+                            ${rec?.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} / unit (${rec?.quotation?.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })} Total)
                           </div>
                           
                           <div style={{ marginTop: "6px", fontSize: "10px", color: "#15803d", borderTop: "1px dashed #bbf7d0", paddingTop: "4px" }}>
                             <strong>Key Reasons:</strong>
                             <ul style={{ margin: "2px 0 0 12px", padding: 0 }}>
-                              {rec.reasonsForSelection.slice(0, 2).map((r, idx) => (
+                              {rec?.reasonsForSelection.slice(0, 2).map((r, idx) => (
                                 <li key={idx}>{r}</li>
                               ))}
                             </ul>
                           </div>
-                        </div>
-                      ) : (
-                        <div style={{ background: "#fef3c7", border: "1px solid #fde68a", padding: "8px 10px", borderRadius: "6px" }}>
-                          <span style={{ color: "#92400e", fontSize: "12px", fontWeight: 600 }}>⚠️ No Bids / Quotations Entered</span>
                         </div>
                       )}
                     </td>

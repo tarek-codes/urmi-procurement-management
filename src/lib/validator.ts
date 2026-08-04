@@ -154,7 +154,7 @@ function rule4_supplierValidation(doc: CSDocument): ValidationResult {
       4,
       "Supplier Validation",
       "error",
-      "No suppliers found in the CS."
+      "No Supplier Quotations — No supplier has quoted for this CS."
     );
   }
 
@@ -171,6 +171,10 @@ function rule4_supplierValidation(doc: CSDocument): ValidationResult {
       "error",
       `Duplicate supplier(s) found: ${[...new Set(dupes)].join(", ")}.`
     );
+  }
+
+  if (doc.suppliers.length === 1) {
+    return pass(4, "Supplier Validation", "Single Supplier CS — 1 supplier participating in this CS (no competitive comparison available).");
   }
 
   return pass(4, "Supplier Validation", `${doc.suppliers.length} active and unique suppliers participating in this CS.`);
