@@ -15,6 +15,7 @@ export interface VendorItemEvaluation {
   finalScore: number;
   rank: number;
   isRecommended: boolean;
+  isNewSupplier?: boolean;
   quotation: SupplierQuotation | null;
   metrics: VendorMetricBreakdown;
   reasonsForSelection: string[];
@@ -218,10 +219,23 @@ export function evaluateItemVendorRecommendations(
         experienceScore,
       };
 
+      // Check if supplier has any historical PO record in the DB
+      const qSupplierLower = vName.toLowerCase().trim();
+      const hasHistoricalPO = historicalRecords.some(
+        (r) =>
+          r.supplierName &&
+          (r.supplierName.toLowerCase().trim() === qSupplierLower ||
+            r.supplierName.toLowerCase().includes(qSupplierLower) ||
+            qSupplierLower.includes(r.supplierName.toLowerCase().trim())) &&
+          (Boolean(r.poDate) || Boolean(r.poNo) || r.poAmount > 0)
+      );
+      const isNewSupplier = !hasHistoricalPO;
+
       return {
         vendorName: vName,
         finalScore,
         isRecommended: false,
+        isNewSupplier,
         quotation: q,
         metrics,
         reasonsForSelection: [],
