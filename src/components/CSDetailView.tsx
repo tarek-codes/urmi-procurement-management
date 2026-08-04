@@ -300,7 +300,7 @@ export default function CSDetailView({ report, onBack }: Props) {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
               <div>
                 <h3 style={{ fontSize: "18px", fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>
-                  8-Metric Vendor Evaluation: {activeModalItem.itemName}
+                  6-Metric Vendor Evaluation: {activeModalItem.itemName}
                 </h3>
                 <p style={{ fontSize: "12px", color: "var(--text-secondary)", margin: "4px 0 0 0" }}>
                   Item Specifications: {activeModalItem.technicalSpecification || "Standard Procurement Item"}
@@ -342,31 +342,43 @@ export default function CSDetailView({ report, onBack }: Props) {
                     </div>
                   </div>
 
-                  {/* 6-Metric Scores Grid */}
+                  {/* 6-Metric Weighted Scores Grid */}
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "12px" }}>
                     <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                       <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Current Price (30%)</div>
-                      <div style={{ fontSize: "14px", fontWeight: 700 }}>{ev.metrics.currentPriceScore}/100</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700 }}>
+                        {((ev.metrics.currentPriceScore * 0.30)).toFixed(1)} / 30
+                      </div>
                     </div>
                     <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                       <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Supplier Trust & Loyalty (20%)</div>
-                      <div style={{ fontSize: "14px", fontWeight: 700, color: "#15803d" }}>{ev.metrics.trustScore}/100</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700, color: "#15803d" }}>
+                        {((ev.metrics.trustScore * 0.20)).toFixed(1)} / 20
+                      </div>
                     </div>
                     <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                       <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Price Consistency (15%)</div>
-                      <div style={{ fontSize: "14px", fontWeight: 700 }}>{ev.metrics.consistencyScore}/100</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700 }}>
+                        {((ev.metrics.consistencyScore * 0.15)).toFixed(1)} / 15
+                      </div>
                     </div>
                     <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                       <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Item Experience (15%)</div>
-                      <div style={{ fontSize: "14px", fontWeight: 700 }}>{ev.metrics.experienceScore}/100</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700 }}>
+                        {((ev.metrics.experienceScore * 0.15)).toFixed(1)} / 15
+                      </div>
                     </div>
                     <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                       <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Historical Win Rate (10%)</div>
-                      <div style={{ fontSize: "14px", fontWeight: 700 }}>{ev.metrics.winRateScore}/100</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700 }}>
+                        {((ev.metrics.winRateScore * 0.10)).toFixed(1)} / 10
+                      </div>
                     </div>
                     <div style={{ background: "#ffffff", padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--border-light)" }}>
                       <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Delivery Speed (10%)</div>
-                      <div style={{ fontSize: "14px", fontWeight: 700 }}>{ev.metrics.deliveryScore}/100</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700 }}>
+                        {((ev.metrics.deliveryScore * 0.10)).toFixed(1)} / 10
+                      </div>
                     </div>
                   </div>
 
