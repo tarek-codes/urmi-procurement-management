@@ -318,9 +318,9 @@ export function evaluateItemVendorRecommendations(
         // 4. Item Experience (15%)
         if (ev.metrics.experienceScore < topEv.metrics.experienceScore - 5) {
           const gap = ((topEv.metrics.experienceScore - ev.metrics.experienceScore) * 0.15).toFixed(2);
-          reasonsAgainstSelection.push(`Item Experience Gap: Fewer past orders supplied for this item (${ev.metrics.experienceScore.toFixed(1)} vs ${topEv.metrics.experienceScore.toFixed(1)}, -${gap}/15 pts).`);
+          reasonsAgainstSelection.push(`Item Experience Gap: Lower experience score for this item (${ev.metrics.experienceScore.toFixed(1)} vs ${topEv.metrics.experienceScore.toFixed(1)}, -${gap}/15 pts).`);
         } else if (ev.metrics.experienceScore < 60) {
-          reasonsAgainstSelection.push(`Limited Item Experience: Supplier has minimal historical PO record for this item (${ev.metrics.experienceScore.toFixed(1)}/100).`);
+          reasonsAgainstSelection.push(`Limited Item Experience: Supplier has minimal historical record for this item (${ev.metrics.experienceScore.toFixed(1)}/100 score).`);
         }
 
         // 5. Historical Win Rate (10%)
