@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useValidation } from "@/context/ValidationContext";
 import ValidationSummary from "@/components/ValidationSummary";
 import CSTable from "@/components/CSTable";
@@ -105,12 +106,25 @@ function DropZone({
   );
 }
 
-export default function CSValidatorPage() {
+function CSValidatorContent() {
   const { reports, csFileName, histFileName, isProcessing, error, selectedSuppliers, processFiles, clearData } = useValidation();
+  const searchParams = useSearchParams();
+  const csNoQuery = searchParams.get("csNo");
+
   const [selectedCsId, setSelectedCsId] = useState<string | null>(null);
 
   const [csFile, setCsFile] = useState<File | null>(null);
   const [histFile, setHistFile] = useState<File | null>(null);
+
+  // Auto-select report if csNo query parameter is set
+  useEffect(() => {
+    if (csNoQuery && reports.length > 0) {
+      const match = reports.find((r) => r.csNo === csNoQuery || r.csId === csNoQuery);
+      if (match) {
+        setSelectedCsId(match.csId);
+      }
+    }
+  }, [csNoQuery, reports]);
 
   const selectedReport = selectedCsId
     ? reports.find((r) => r.csId === selectedCsId)
@@ -208,6 +222,29 @@ export default function CSValidatorPage() {
         </Link>
       </div>
 
+      {/* Prompt banner if user arrived via csNo link but files are not loaded yet */}
+      {csNoQuery && reports.length === 0 && !isProcessing && (
+        <div
+          style={{
+            background: "#eff6ff",
+            border: "1px solid #bfdbfe",
+            color: "#1e40af",
+            padding: "12px 16px",
+            borderRadius: "8px",
+            marginBottom: "20px",
+            fontSize: "13px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
+          <span style={{ fontSize: "16px" }}>ℹ️</span>
+          <span>
+            Targeting Comparative Statement: <strong>{csNoQuery}</strong>. Please upload the CS and Historical Excel files below to load its detailed validation view.
+          </span>
+        </div>
+      )}
+
       {/* Two-file upload zone — only when no data loaded */}
       {reports.length === 0 && !isProcessing && (
         <div style={{ maxWidth: "680px", margin: "0 auto" }}>
@@ -265,7 +302,7 @@ export default function CSValidatorPage() {
         <div className="error-alert">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
           {error}
@@ -324,5 +361,13 @@ export default function CSValidatorPage() {
         />
       )}
     </main>
+  );
+}
+
+export default function CSValidatorPage() {
+  return (
+    <Suspense fallback={<div className="spinner-container"><div className="spinner"></div></div>}>
+      <CSValidatorContent />
+    </Suspense>
   );
 }
