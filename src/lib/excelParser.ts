@@ -188,7 +188,18 @@ function extractQuotations(row: Record<string, unknown>): SupplierQuotation[] {
     });
   }
 
-  return quotations;
+  // Deduplicate by supplier name (case-insensitive) — keep first occurrence.
+  // The flexible column-key fallback matching can sometimes resolve the same
+  // column for multiple slot indices, producing duplicate entries.
+  const seen = new Set<string>();
+  const deduped = quotations.filter((q) => {
+    const key = q.supplierName.toLowerCase().trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return deduped;
 }
 
 /** Parse a numeric value that may include commas or be a string */

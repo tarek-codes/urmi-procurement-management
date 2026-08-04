@@ -52,9 +52,18 @@ export function evaluateItemVendorRecommendations(
 
   return items.map((item) => {
     // Filter out corrupted/missing quotes where unit rate is 0
-    const validQuotations = (item.quotations ?? []).filter(
+    const nonZeroQuotations = (item.quotations ?? []).filter(
       (q) => q.unitRate > 0
     );
+
+    // Deduplicate by supplier name (case-insensitive safety net)
+    const seenSuppliers = new Set<string>();
+    const validQuotations = nonZeroQuotations.filter((q) => {
+      const key = q.supplierName.toLowerCase().trim();
+      if (seenSuppliers.has(key)) return false;
+      seenSuppliers.add(key);
+      return true;
+    });
 
     if (validQuotations.length === 0) {
       return {

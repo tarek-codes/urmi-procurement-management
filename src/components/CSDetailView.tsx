@@ -225,7 +225,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                             >
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "4px" }}>
                                 <span style={{ fontWeight: 700, fontSize: "12px", color: isConfirmed ? (confirmed.isRecommended ? "#15803d" : "#1e40af") : "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px", display: "flex", alignItems: "center", gap: "3px" }} title={ev.vendorName}>
-                                  #{ev.rank} {ev.vendorName}
+                                  {ev.vendorName}
                                   {isAiRec && !confirmed && <span style={{ fontSize: "9px", background: "#dcfce7", color: "#166534", padding: "1px 4px", borderRadius: "3px", fontWeight: 600 }}>AI Pick</span>}
                                   {isConfirmed && <span style={{ fontSize: "10px" }}>✓</span>}
                                 </span>
@@ -399,7 +399,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <span style={{ fontSize: "16px", fontWeight: 700, color: "var(--text-primary)" }}>
-                        Rank #{ev.rank}: {ev.vendorName}
+                        {ev.vendorName}
                       </span>
                       {ev.isRecommended && (
                         <span style={{ background: "#16a34a", color: "white", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: 700 }}>
