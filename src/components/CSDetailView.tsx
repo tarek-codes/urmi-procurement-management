@@ -215,7 +215,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                     <td>
                       {itemRec.evaluations.length === 0 ? (
                         <div style={{ background: "#fef2f2", border: "1px solid #fecaca", padding: "8px 10px", borderRadius: "6px" }}>
-                          <span style={{ color: "#b91c1c", fontSize: "12px", fontWeight: 600 }}>⚠️ No supplier has quoted for this CS</span>
+                          <span style={{ color: "#b91c1c", fontSize: "12px", fontWeight: 600 }}>⚠️ No supplier has quoted for this item</span>
                         </div>
                       ) : itemRec.evaluations.length === 1 ? (
                         <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "8px 10px", borderRadius: "6px" }}>
