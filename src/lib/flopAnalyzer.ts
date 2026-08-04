@@ -203,7 +203,7 @@ export function analyzeFlopPurchases(
       if (selRating && selRating.grade === "F") {
         isFlop = true;
         flopReasons.push(
-          `Unacceptable Vendor Rating: ${selected.supplierName} holds Grade F in historical performance (${selRating.avgLeadTimeDays} days avg lead time, ${selRating.fulfillmentRatePct}% fulfillment).`
+          `Unacceptable Supplier Rating: ${selected.supplierName} holds Grade F in historical performance (${selRating.avgLeadTimeDays} days avg lead time, ${selRating.fulfillmentRatePct}% fulfillment).`
         );
       }
 
@@ -213,11 +213,11 @@ export function analyzeFlopPurchases(
         totalPotentialSavingsLost += potentialSavings;
         csSavings += potentialSavings;
 
-        explanation = `Selected vendor "${
+        explanation = `Selected supplier "${
           selected.supplierName
         }" is flagged because ${flopReasons
           .join(" ")
-          .toLowerCase()} Recommended vendor "${
+          .toLowerCase()} Recommended supplier "${
           recommended.supplierName
         }" offers unit rate $${recommended.unitRate.toFixed(
           2
@@ -225,7 +225,7 @@ export function analyzeFlopPurchases(
           recRating ? recRating.grade : "N/A"
         } (${recRating ? recRating.avgLeadTimeDays : "N/A"} days lead time).`;
       } else {
-        explanation = `Selected vendor "${selected.supplierName}" is optimal (Lowest price option selected at $${selected.unitRate.toFixed(2)}/unit, Grade ${
+        explanation = `Selected supplier "${selected.supplierName}" is optimal (Lowest price option selected at $${selected.unitRate.toFixed(2)}/unit, Grade ${
           selRating ? selRating.grade : "Normal"
         }).`;
       }

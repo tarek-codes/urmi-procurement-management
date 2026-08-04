@@ -53,7 +53,7 @@ export default function LandingPage() {
           </div>
           <h2 className="module-title-compact" style={{ fontSize: "18px", marginBottom: "6px" }}>Historical Data Dashboard</h2>
           <p className="module-description-compact" style={{ fontSize: "13px", lineHeight: "1.5", marginBottom: "14px" }}>
-            Deep-dive analytics across 18 metrics (cycle times, savings, vendor scores, cost escalations).
+            Deep-dive analytics across 18 metrics (cycle times, savings, supplier scores, cost escalations).
           </p>
           <div className="module-action-link link-emerald" style={{ fontSize: "13px", fontWeight: 600 }}>
             Explore Analytics →
@@ -73,7 +73,7 @@ export default function LandingPage() {
           </div>
           <h2 className="module-title-compact" style={{ fontSize: "18px", marginBottom: "6px" }}>Flop Purchase Analyzer</h2>
           <p className="module-description-compact" style={{ fontSize: "13px", lineHeight: "1.5", marginBottom: "14px" }}>
-            Cross-reference CS files against Historical DB to detect sub-optimal vendor choices and price overrides.
+            Cross-reference CS files against Historical DB to detect sub-optimal supplier choices and price overrides.
           </p>
           <div className="module-action-link" style={{ fontSize: "13px", fontWeight: 600 }}>
             Run Analyzer →

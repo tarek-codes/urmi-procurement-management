@@ -124,8 +124,8 @@ export default function CSDetailView({ report, onBack }: Props) {
               <tr>
                 <th style={{ width: "40px" }}>#</th>
                 <th style={{ width: "220px" }}>Item Details</th>
-                <th>Itemwise Vendor Bids & Composite Score</th>
-                <th style={{ width: "240px" }}>Recommended Vendor & Reasons</th>
+                <th>Itemwise Supplier Bids & Composite Score</th>
+                <th style={{ width: "240px" }}>Recommended Supplier & Reasons</th>
                 <th style={{ textAlign: "center", width: "110px" }}>Actions</th>
               </tr>
             </thead>
@@ -313,7 +313,7 @@ export default function CSDetailView({ report, onBack }: Props) {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
               <div>
                 <h3 style={{ fontSize: "18px", fontWeight: 700, margin: 0, color: "var(--text-primary)" }}>
-                  6-Metric Vendor Evaluation: {activeModalItem.itemName}
+                  6-Metric Supplier Evaluation: {activeModalItem.itemName}
                 </h3>
                 <p style={{ fontSize: "12px", color: "var(--text-secondary)", margin: "4px 0 0 0" }}>
                   Item Specifications: {activeModalItem.technicalSpecification || "Standard Procurement Item"}
@@ -346,7 +346,7 @@ export default function CSDetailView({ report, onBack }: Props) {
                       </span>
                       {ev.isRecommended && (
                         <span style={{ background: "#16a34a", color: "white", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: 700 }}>
-                          💡 RECOMMENDED VENDOR
+                          💡 RECOMMENDED SUPPLIER
                         </span>
                       )}
                     </div>
