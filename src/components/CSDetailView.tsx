@@ -18,15 +18,16 @@ export default function CSDetailView({ report, onBack }: Props) {
   const { historicalRecords } = useValidation();
   const [activeModalItem, setActiveModalItem] = useState<ItemRecommendationResult | null>(null);
 
-  // Manual supplier selection overrides state keyed by item slNo
-  const [overrides, setOverrides] = useState<
-    Record<number, { supplierName: string; auditReason: string }>
+  // Confirmed supplier selections keyed by item slNo (null means user hasn't confirmed yet)
+  const [selections, setSelections] = useState<
+    Record<number, { supplierName: string; auditReason: string; isRecommended: boolean }>
   >({});
 
-  // Active item pending override selection modal state
-  const [overrideModal, setOverrideModal] = useState<{
+  // Confirmation/audit modal state
+  const [confirmModal, setConfirmModal] = useState<{
     itemRec: ItemRecommendationResult;
     targetSupplierName: string;
+    isRecommended: boolean;
     reasonText: string;
   } | null>(null);
 
@@ -144,10 +145,10 @@ export default function CSDetailView({ report, onBack }: Props) {
             <tbody>
               {itemRecommendations.map((itemRec) => {
                 const rec = itemRec.recommendedVendor;
-                const activeOverride = overrides[itemRec.slNo];
-                const displaySupplier = activeOverride
-                  ? itemRec.evaluations.find((e) => e.vendorName === activeOverride.supplierName) || rec
-                  : rec;
+                const confirmed = selections[itemRec.slNo];
+                const displaySupplier = confirmed
+                  ? itemRec.evaluations.find((e) => e.vendorName === confirmed.supplierName) || null
+                  : null;
 
                 return (
                   <tr key={itemRec.slNo}>
@@ -176,8 +177,8 @@ export default function CSDetailView({ report, onBack }: Props) {
                     <td>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: "8px" }}>
                         {itemRec.evaluations.map((ev) => {
-                          const isRec = ev.isRecommended;
-                          const isSelected = displaySupplier?.vendorName === ev.vendorName;
+                          const isConfirmed = confirmed?.supplierName === ev.vendorName;
+                          const isAiRec = ev.isRecommended;
 
                           let badgeStyle: React.CSSProperties = {
                             padding: "8px 12px",
@@ -187,16 +188,24 @@ export default function CSDetailView({ report, onBack }: Props) {
                             display: "flex",
                             flexDirection: "column",
                             gap: "4px",
-                            cursor: itemRec.evaluations.length > 1 ? "pointer" : "default",
+                            cursor: "pointer",
                             transition: "all 0.15s ease",
+                            outline: "none",
                           };
 
-                          if (isSelected) {
+                          if (isConfirmed) {
                             badgeStyle = {
                               ...badgeStyle,
-                              background: activeOverride ? "#eff6ff" : "#f0fdf4",
-                              borderColor: activeOverride ? "#3b82f6" : "#16a34a",
-                              boxShadow: `0 2px 5px ${activeOverride ? "rgba(59, 130, 246, 0.25)" : "rgba(22, 163, 74, 0.2)"}`,
+                              background: confirmed.isRecommended ? "#f0fdf4" : "#eff6ff",
+                              borderColor: confirmed.isRecommended ? "#16a34a" : "#3b82f6",
+                              boxShadow: `0 2px 5px ${confirmed.isRecommended ? "rgba(22, 163, 74, 0.2)" : "rgba(59, 130, 246, 0.25)"}`,
+                            };
+                          } else if (isAiRec && !confirmed) {
+                            // Soft highlight AI recommended when nothing is selected yet
+                            badgeStyle = {
+                              ...badgeStyle,
+                              borderColor: "#bbf7d0",
+                              background: "#f9fefb",
                             };
                           }
 
@@ -204,38 +213,33 @@ export default function CSDetailView({ report, onBack }: Props) {
                             <div
                               key={ev.vendorName}
                               style={badgeStyle}
-                              title={itemRec.evaluations.length > 1 ? `Click to select ${ev.vendorName}` : ev.vendorName}
+                              title={`Click to select ${ev.vendorName}`}
                               onClick={() => {
-                                if (itemRec.evaluations.length <= 1) return;
-                                if (ev.vendorName !== (rec?.vendorName || "")) {
-                                  setOverrideModal({
-                                    itemRec,
-                                    targetSupplierName: ev.vendorName,
-                                    reasonText: activeOverride?.supplierName === ev.vendorName ? activeOverride.auditReason : "",
-                                  });
-                                } else {
-                                  // Reset override if user clicks AI recommended supplier back
-                                  const copy = { ...overrides };
-                                  delete copy[itemRec.slNo];
-                                  setOverrides(copy);
-                                }
+                                setConfirmModal({
+                                  itemRec,
+                                  targetSupplierName: ev.vendorName,
+                                  isRecommended: ev.isRecommended,
+                                  reasonText: confirmed?.supplierName === ev.vendorName ? confirmed.auditReason : "",
+                                });
                               }}
                             >
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "4px" }}>
-                                <span style={{ fontWeight: 700, fontSize: "12px", color: isSelected ? (activeOverride ? "#1e40af" : "#15803d") : "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px" }} title={ev.vendorName}>
-                                  #{ev.rank} {ev.vendorName} {isSelected ? "✓" : ""}
+                                <span style={{ fontWeight: 700, fontSize: "12px", color: isConfirmed ? (confirmed.isRecommended ? "#15803d" : "#1e40af") : "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "120px", display: "flex", alignItems: "center", gap: "3px" }} title={ev.vendorName}>
+                                  #{ev.rank} {ev.vendorName}
+                                  {isAiRec && !confirmed && <span style={{ fontSize: "9px", background: "#dcfce7", color: "#166534", padding: "1px 4px", borderRadius: "3px", fontWeight: 600 }}>AI Pick</span>}
+                                  {isConfirmed && <span style={{ fontSize: "10px" }}>✓</span>}
                                 </span>
-                                <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", background: isSelected ? (activeOverride ? "#2563eb" : "#16a34a") : "#64748b", color: "#ffffff" }}>
-                                  Score: {ev.finalScore}
+                                <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", background: isConfirmed ? (confirmed.isRecommended ? "#16a34a" : "#2563eb") : "#64748b", color: "#ffffff", flexShrink: 0 }}>
+                                  {ev.finalScore} pts
                                 </span>
                               </div>
 
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: "12px", marginTop: "2px" }}>
                                 <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
-                                  Rate: ${ev.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                  ${ev.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}/unit
                                 </span>
                                 <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                                  Total: ${ev.quotation?.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                                  ${ev.quotation?.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })} total
                                 </span>
                               </div>
                             </div>
@@ -261,42 +265,51 @@ export default function CSDetailView({ report, onBack }: Props) {
                             Single supplier quote available — no competitive comparison required.
                           </div>
                         </div>
+                      ) : !confirmed ? (
+                        // Nothing selected yet
+                        <div style={{ background: "#fafafa", border: "1px dashed #cbd5e1", padding: "10px", borderRadius: "6px", textAlign: "center" }}>
+                          <div style={{ fontSize: "18px", marginBottom: "4px" }}>👆</div>
+                          <div style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>No supplier selected</div>
+                          <div style={{ fontSize: "10px", color: "#94a3b8", marginTop: "2px" }}>Click a supplier card on the left to select</div>
+                        </div>
                       ) : (
-                        <div style={{ background: activeOverride ? "#eff6ff" : "#f0fdf4", border: `1px solid ${activeOverride ? "#bfdbfe" : "#bbf7d0"}`, padding: "8px 10px", borderRadius: "6px" }}>
+                        <div style={{ background: confirmed.isRecommended ? "#f0fdf4" : "#eff6ff", border: `1px solid ${confirmed.isRecommended ? "#bbf7d0" : "#bfdbfe"}`, padding: "8px 10px", borderRadius: "6px" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ fontSize: "11px", color: activeOverride ? "#1e40af" : "#166534", fontWeight: 700 }}>
-                              {activeOverride ? "✍️ Manually Selected Supplier:" : "💡 Recommended Supplier:"}
+                            <span style={{ fontSize: "11px", color: confirmed.isRecommended ? "#166534" : "#1e40af", fontWeight: 700 }}>
+                              {confirmed.isRecommended ? "💡 AI Recommended:" : "✍️ Manually Selected:"}
                             </span>
-                            <span style={{ fontSize: "10px", fontWeight: 700, background: activeOverride ? "#2563eb" : "#16a34a", color: "white", padding: "1px 5px", borderRadius: "3px" }}>
-                              Score {displaySupplier?.finalScore}/100
+                            <span style={{ fontSize: "10px", fontWeight: 700, background: confirmed.isRecommended ? "#16a34a" : "#2563eb", color: "white", padding: "1px 5px", borderRadius: "3px" }}>
+                              {displaySupplier?.finalScore} pts
                             </span>
                           </div>
 
-                          <div style={{ fontSize: "13px", fontWeight: 700, color: activeOverride ? "#1e40af" : "#15803d", marginTop: "3px" }}>
+                          <div style={{ fontSize: "13px", fontWeight: 700, color: confirmed.isRecommended ? "#15803d" : "#1e40af", marginTop: "3px" }}>
                             {displaySupplier?.vendorName}
                           </div>
 
-                          <div style={{ fontSize: "11px", color: activeOverride ? "#1e40af" : "#166534", marginTop: "1px", fontWeight: 600 }}>
-                            ${displaySupplier?.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })} / unit (${displaySupplier?.quotation?.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })} Total)
+                          <div style={{ fontSize: "11px", color: confirmed.isRecommended ? "#166534" : "#1e40af", marginTop: "1px", fontWeight: 600 }}>
+                            ${displaySupplier?.quotation?.unitRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}/unit · ${displaySupplier?.quotation?.totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })} total
                           </div>
 
-                          {activeOverride ? (
+                          {!confirmed.isRecommended && confirmed.auditReason && (
                             <div style={{ marginTop: "6px", fontSize: "10px", color: "#1e40af", borderTop: "1px dashed #bfdbfe", paddingTop: "4px" }}>
-                              <strong>📝 Mandatory Audit Reason Note:</strong>
+                              <strong>📝 Audit Reason Note:</strong>
                               <div style={{ marginTop: "2px", fontStyle: "italic", background: "#ffffff", padding: "4px 6px", borderRadius: "3px", border: "1px solid #dbeafe" }}>
-                                "{activeOverride.auditReason}"
+                                "{confirmed.auditReason}"
                               </div>
                             </div>
-                          ) : (
-                            <div style={{ marginTop: "6px", fontSize: "10px", color: "#15803d", borderTop: "1px dashed #bbf7d0", paddingTop: "4px" }}>
-                              <strong>Key Reasons:</strong>
-                              <ul style={{ margin: "2px 0 0 12px", padding: 0 }}>
-                                {rec?.reasonsForSelection.slice(0, 2).map((r, idx) => (
-                                  <li key={idx}>{r}</li>
-                                ))}
-                              </ul>
-                            </div>
                           )}
+
+                          <button
+                            onClick={() => {
+                              const copy = { ...selections };
+                              delete copy[itemRec.slNo];
+                              setSelections(copy);
+                            }}
+                            style={{ marginTop: "6px", fontSize: "10px", color: "#64748b", background: "none", border: "none", cursor: "pointer", padding: 0, textDecoration: "underline" }}
+                          >
+                            Change selection
+                          </button>
                         </div>
                       )}
                     </td>
@@ -398,18 +411,12 @@ export default function CSDetailView({ report, onBack }: Props) {
                       {activeModalItem.evaluations.length > 1 && (
                         <button
                           onClick={() => {
-                            const rec = activeModalItem.recommendedVendor;
-                            if (ev.vendorName !== (rec?.vendorName || "")) {
-                              setOverrideModal({
-                                itemRec: activeModalItem,
-                                targetSupplierName: ev.vendorName,
-                                reasonText: overrides[activeModalItem.slNo]?.supplierName === ev.vendorName ? overrides[activeModalItem.slNo].auditReason : "",
-                              });
-                            } else {
-                              const copy = { ...overrides };
-                              delete copy[activeModalItem.slNo];
-                              setOverrides(copy);
-                            }
+                            setConfirmModal({
+                              itemRec: activeModalItem,
+                              targetSupplierName: ev.vendorName,
+                              isRecommended: ev.isRecommended,
+                              reasonText: selections[activeModalItem.slNo]?.supplierName === ev.vendorName ? selections[activeModalItem.slNo].auditReason : "",
+                            });
                             setActiveModalItem(null);
                           }}
                           style={{
@@ -418,12 +425,12 @@ export default function CSDetailView({ report, onBack }: Props) {
                             fontWeight: 700,
                             borderRadius: "4px",
                             border: "none",
-                            background: overrides[activeModalItem.slNo]?.supplierName === ev.vendorName || (!overrides[activeModalItem.slNo] && ev.isRecommended) ? "#16a34a" : "#2563eb",
+                            background: selections[activeModalItem.slNo]?.supplierName === ev.vendorName ? "#16a34a" : "#2563eb",
                             color: "#ffffff",
                             cursor: "pointer",
                           }}
                         >
-                          {overrides[activeModalItem.slNo]?.supplierName === ev.vendorName || (!overrides[activeModalItem.slNo] && ev.isRecommended) ? "✓ Selected" : "Select Supplier"}
+                          {selections[activeModalItem.slNo]?.supplierName === ev.vendorName ? "✓ Selected" : "Select Supplier"}
                         </button>
                       )}
                       <div style={{ fontSize: "16px", fontWeight: 800, color: ev.isRecommended ? "#15803d" : "var(--text-primary)" }}>
@@ -505,11 +512,9 @@ export default function CSDetailView({ report, onBack }: Props) {
         </div>
       )}
 
-      {/* Mandatory Audit Reason Note Modal for Manual Supplier Overrides */}
-      {overrideModal && (
+      {/* Supplier Confirmation / Audit Modal */}
+      {confirmModal && (
         <div
-          className="modal-overlay"
-          onClick={() => setOverrideModal(null)}
           style={{
             position: "fixed",
             top: 0,
@@ -524,101 +529,120 @@ export default function CSDetailView({ report, onBack }: Props) {
             zIndex: 1100,
             padding: "16px",
           }}
+          onClick={() => setConfirmModal(null)}
         >
           <div
-            className="modal-card"
             style={{
               maxWidth: "500px",
               width: "100%",
               background: "#ffffff",
-              borderRadius: "12px",
+              borderRadius: "14px",
               padding: "24px",
-              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2)",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0,0,0,0.05)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
-              <span style={{ fontSize: "24px" }}>✍️</span>
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
+              <span style={{ fontSize: "26px" }}>{confirmModal.isRecommended ? "💡" : "✍️"}</span>
               <div>
                 <h3 style={{ fontSize: "17px", fontWeight: 700, margin: 0, color: "#1e293b" }}>
-                  Mandatory Audit Reason Note
+                  {confirmModal.isRecommended ? "Confirm AI Recommended Supplier" : "Select Non-Recommended Supplier"}
                 </h3>
                 <p style={{ fontSize: "12px", color: "#64748b", margin: "2px 0 0 0" }}>
-                  Item: <strong>{overrideModal.itemRec.itemName}</strong>
+                  Item: <strong>{confirmModal.itemRec.itemName}</strong>
                 </p>
               </div>
             </div>
 
-            <div style={{ background: "#f1f5f9", padding: "10px 12px", borderRadius: "6px", marginBottom: "16px", fontSize: "12px", color: "#334155" }}>
-              You are manually overriding the AI recommended supplier to select:
-              <div style={{ fontWeight: 700, color: "#1e40af", fontSize: "13px", marginTop: "2px" }}>
-                {overrideModal.targetSupplierName}
+            {/* Supplier info pill */}
+            <div
+              style={{
+                background: confirmModal.isRecommended ? "#f0fdf4" : "#eff6ff",
+                border: `1px solid ${confirmModal.isRecommended ? "#bbf7d0" : "#bfdbfe"}`,
+                padding: "10px 14px",
+                borderRadius: "8px",
+                marginBottom: "16px",
+                fontSize: "13px",
+                color: confirmModal.isRecommended ? "#166534" : "#1e40af",
+                fontWeight: 600,
+              }}
+            >
+              {confirmModal.isRecommended ? "✓ AI Recommended:" : "Selecting:"}{" "}
+              <strong>{confirmModal.targetSupplierName}</strong>
+            </div>
+
+            {/* Mandatory audit reason — only for non-recommended */}
+            {!confirmModal.isRecommended && (
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#1e293b", marginBottom: "6px" }}>
+                  Selection Reason Note <span style={{ color: "#dc2626" }}>*</span>
+                  <span style={{ fontWeight: 400, color: "#64748b", marginLeft: "4px" }}>(required for audit trail)</span>
+                </label>
+                <textarea
+                  value={confirmModal.reasonText}
+                  onChange={(e) => setConfirmModal({ ...confirmModal, reasonText: e.target.value })}
+                  placeholder="e.g. Urgent delivery required within 24h, specific brand approved by department head, lower total cost after negotiation..."
+                  rows={4}
+                  style={{
+                    width: "100%",
+                    padding: "10px",
+                    fontSize: "13px",
+                    borderRadius: "6px",
+                    border: `1px solid ${confirmModal.reasonText.trim() ? "#93c5fd" : "#fca5a5"}`,
+                    outline: "none",
+                    fontFamily: "inherit",
+                    resize: "vertical",
+                    boxSizing: "border-box",
+                    transition: "border-color 0.15s",
+                  }}
+                />
+                {!confirmModal.reasonText.trim() && (
+                  <span style={{ fontSize: "11px", color: "#dc2626", marginTop: "4px", display: "block" }}>
+                    ⚠ A reason note is required to select a non-recommended supplier.
+                  </span>
+                )}
               </div>
-            </div>
+            )}
 
-            <div style={{ marginBottom: "16px" }}>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#1e293b", marginBottom: "6px" }}>
-                Audit Justification / Procurement Reason <span style={{ color: "#dc2626" }}>*</span>
-              </label>
-              <textarea
-                value={overrideModal.reasonText}
-                onChange={(e) =>
-                  setOverrideModal({
-                    ...overrideModal,
-                    reasonText: e.target.value,
-                  })
-                }
-                placeholder="e.g. Urgent emergency delivery required within 24 hours / Specific technical brand sample approved by department head..."
-                rows={4}
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  fontSize: "13px",
-                  borderRadius: "6px",
-                  border: "1px solid #cbd5e1",
-                  outline: "none",
-                  fontFamily: "inherit",
-                  resize: "vertical",
-                }}
-              />
-              <span style={{ fontSize: "11px", color: "#64748b", marginTop: "4px", display: "block" }}>
-                A mandatory justification note is required for internal & external procurement compliance audits.
-              </span>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+            {/* Action buttons */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: confirmModal.isRecommended ? "0" : undefined }}>
               <button
                 className="btn-clear"
-                onClick={() => setOverrideModal(null)}
-                style={{ padding: "8px 14px", fontSize: "12px" }}
+                onClick={() => setConfirmModal(null)}
+                style={{ padding: "8px 14px", fontSize: "13px" }}
               >
                 Cancel
               </button>
               <button
-                disabled={!overrideModal.reasonText.trim()}
+                disabled={!confirmModal.isRecommended && !confirmModal.reasonText.trim()}
                 onClick={() => {
-                  if (!overrideModal.reasonText.trim()) return;
-                  setOverrides({
-                    ...overrides,
-                    [overrideModal.itemRec.slNo]: {
-                      supplierName: overrideModal.targetSupplierName,
-                      auditReason: overrideModal.reasonText.trim(),
+                  if (!confirmModal.isRecommended && !confirmModal.reasonText.trim()) return;
+                  setSelections({
+                    ...selections,
+                    [confirmModal.itemRec.slNo]: {
+                      supplierName: confirmModal.targetSupplierName,
+                      auditReason: confirmModal.reasonText.trim(),
+                      isRecommended: confirmModal.isRecommended,
                     },
                   });
-                  setOverrideModal(null);
+                  setConfirmModal(null);
                 }}
                 style={{
-                  padding: "8px 16px",
-                  fontSize: "12px",
+                  padding: "8px 18px",
+                  fontSize: "13px",
                   fontWeight: 700,
-                  background: overrideModal.reasonText.trim() ? "#1e40af" : "#94a3b8",
+                  background: (!confirmModal.isRecommended && !confirmModal.reasonText.trim())
+                    ? "#94a3b8"
+                    : confirmModal.isRecommended ? "#16a34a" : "#1e40af",
                   color: "#ffffff",
-                  borderRadius: "6px",
+                  borderRadius: "7px",
                   border: "none",
-                  cursor: overrideModal.reasonText.trim() ? "pointer" : "not-allowed",
+                  cursor: (!confirmModal.isRecommended && !confirmModal.reasonText.trim()) ? "not-allowed" : "pointer",
+                  transition: "background 0.15s",
                 }}
               >
-                Confirm & Save Audit Reason Note
+                {confirmModal.isRecommended ? "✓ Confirm Selection" : "Confirm & Save Audit Note"}
               </button>
             </div>
           </div>
