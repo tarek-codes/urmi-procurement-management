@@ -49,7 +49,7 @@ export function parseExcelFile(buffer: ArrayBuffer): CSDocument[] {
     const firstRow = csRows[0];
 
     const items: CSItem[] = csRows.map((row) => {
-      const quotations = extractQuotations(row);
+      const quotations = extractQuotations(row as unknown as Record<string, unknown>);
       const minQuotation =
         quotations.length > 0
           ? quotations.reduce((min, q) =>
@@ -123,28 +123,76 @@ export function parseExcelFile(buffer: ArrayBuffer): CSDocument[] {
   return documents;
 }
 
-/** Extract up to 5 supplier quotations from a raw row */
-function extractQuotations(row: RawCSRow): SupplierQuotation[] {
+/** Extract up to 10 supplier quotations from a raw row (supporting various column naming conventions) */
+function extractQuotations(row: Record<string, unknown>): SupplierQuotation[] {
   const quotations: SupplierQuotation[] = [];
 
-  for (let i = 1; i <= 5; i++) {
-    const nameKey = `SUPPLIER_NAME_${i}` as keyof RawCSRow;
-    const rateKey = `UNIT_RATE_${i}` as keyof RawCSRow;
-    const qtyKey = `QTY_${i}` as keyof RawCSRow;
-    const totalKey = `TOTAL_PRICE_${i}` as keyof RawCSRow;
+  // Helper to find value across multiple candidate key patterns
+  const findVal = (rowObj: Record<string, unknown>, ...patterns: string[]): unknown => {
+    for (const pat of patterns) {
+      for (const [k, v] of Object.entries(rowObj)) {
+        const normK = k.trim().replace(/\s+/g, "_").toUpperCase();
+        if (normK === pat || normK.includes(pat)) {
+          if (v !== undefined && v !== "" && v !== null) return v;
+        }
+      }
+    }
+    return undefined;
+  };
 
-    const name = String(row[nameKey] || "").trim();
-    if (!name) continue;
+  for (let i = 1; i <= 10; i++) {
+    // Look up supplier name with multiple possible column key variations
+    const rawName = findVal(
+      row,
+      `SUPPLIER_NAME_${i}`,
+      `SUPPLIER_${i}`,
+      `VENDOR_NAME_${i}`,
+      `VENDOR_${i}`,
+      `SUPPLIER_NAME${i}`,
+      `SUPPLIER${i}`
+    );
 
-    const unitRate = parseNumeric(row[rateKey]);
-    const quantity = parseNumeric(row[qtyKey]);
-    const totalPrice = parseNumeric(row[totalKey]);
+    const name = String(rawName || "").trim();
+    if (!name || name.toUpperCase() === "N/A" || name.toUpperCase() === "UNDEFINED") continue;
+
+    // Look up unit rate
+    const rawRate = findVal(
+      row,
+      `UNIT_RATE_${i}`,
+      `RATE_${i}`,
+      `UNIT_PRICE_${i}`,
+      `PRICE_${i}`,
+      `UNIT_RATE${i}`,
+      `RATE${i}`
+    );
+    const unitRate = parseNumeric(rawRate);
+
+    // Look up quantity
+    const rawQty = findVal(
+      row,
+      `QTY_${i}`,
+      `QUANTITY_${i}`,
+      `QTY${i}`,
+      `QUANTITY${i}`
+    );
+    const quantity = parseNumeric(rawQty) || 1;
+
+    // Look up total price
+    const rawTotal = findVal(
+      row,
+      `TOTAL_PRICE_${i}`,
+      `TOTAL_AMOUNT_${i}`,
+      `TOTAL_${i}`,
+      `AMOUNT_${i}`,
+      `TOTAL_PRICE${i}`
+    );
+    const totalPrice = parseNumeric(rawTotal) || (unitRate * quantity);
 
     quotations.push({
       supplierName: name,
       unitRate,
       quantity,
-      totalPrice: totalPrice || unitRate * quantity,
+      totalPrice,
     });
   }
 
@@ -168,15 +216,12 @@ function formatDate(val: unknown): string {
     return val.toISOString().split("T")[0];
   }
   if (typeof val === "number") {
-    // Excel serial date number — convert to JS Date
     const date = new Date((val - 25569) * 86400 * 1000);
     return date.toISOString().split("T")[0];
   }
   if (typeof val === "string") {
     const str = val.trim();
-    // If it looks like a date string already, return as-is
     if (str.match(/\d{4}-\d{2}-\d{2}/)) return str;
-    // Try parsing
     const d = new Date(str);
     if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
     return str;
@@ -186,36 +231,45 @@ function formatDate(val: unknown): string {
 
 /** Map normalised keys to RawCSRow */
 function mapToRawCSRow(obj: Record<string, unknown>): RawCSRow {
+  const getStr = (...keys: string[]) => {
+    for (const k of keys) {
+      if (obj[k] !== undefined && obj[k] !== null && String(obj[k]).trim() !== "") {
+        return String(obj[k]).trim();
+      }
+    }
+    return "";
+  };
+
   return {
-    SL_NO: Number(obj["SL_NO"] || obj["SL NO"] || 0),
-    COMPANY_NAME: String(obj["COMPANY_NAME"] || ""),
-    REQUISITIONS: String(obj["REQUISITIONS"] || ""),
-    CS_NO: String(obj["CS_NO"] || ""),
-    CS_DATE: formatDate(obj["CS_DATE"]),
-    PROCURER: String(obj["PROCURER"] || ""),
-    ITEM_NAME: String(obj["ITEM_NAME"] || ""),
-    TS_ID: (obj["TS_ID"] ?? obj["TS_ID"] ?? "") as string | number,
-    TECHNICAL_SPECIFICATION: String(obj["TECHNICAL_SPECIFICATION"] || ""),
-    SUPPLIER_NAME_1: String(obj["SUPPLIER_NAME_1"] || ""),
-    UNIT_RATE_1: parseNumeric(obj["UNIT_RATE_1"]),
-    QTY_1: parseNumeric(obj["QTY_1"]),
-    TOTAL_PRICE_1: parseNumeric(obj["TOTAL_PRICE_1"]),
-    SUPPLIER_NAME_2: String(obj["SUPPLIER_NAME_2"] || ""),
-    UNIT_RATE_2: parseNumeric(obj["UNIT_RATE_2"]),
-    QTY_2: parseNumeric(obj["QTY_2"]),
-    TOTAL_PRICE_2: parseNumeric(obj["TOTAL_PRICE_2"]),
-    SUPPLIER_NAME_3: String(obj["SUPPLIER_NAME_3"] || ""),
-    UNIT_RATE_3: parseNumeric(obj["UNIT_RATE_3"]),
-    QTY_3: parseNumeric(obj["QTY_3"]),
-    TOTAL_PRICE_3: parseNumeric(obj["TOTAL_PRICE_3"]),
-    SUPPLIER_NAME_4: String(obj["SUPPLIER_NAME_4"] || ""),
-    UNIT_RATE_4: parseNumeric(obj["UNIT_RATE_4"]),
-    QTY_4: parseNumeric(obj["QTY_4"]),
-    TOTAL_PRICE_4: parseNumeric(obj["TOTAL_PRICE_4"]),
-    SUPPLIER_NAME_5: String(obj["SUPPLIER_NAME_5"] || ""),
-    UNIT_RATE_5: parseNumeric(obj["UNIT_RATE_5"]),
-    QTY_5: parseNumeric(obj["QTY_5"]),
-    TOTAL_PRICE_5: parseNumeric(obj["TOTAL_PRICE_5"]),
-    CS_MAIN_VALUE: parseNumeric(obj["CS_MAIN_VALUE"]),
+    SL_NO: Number(obj["SL_NO"] || obj["SL NO"] || obj["SL"] || 0),
+    COMPANY_NAME: getStr("COMPANY_NAME", "COMPANY", "COMP"),
+    REQUISITIONS: getStr("REQUISITIONS", "REQUISITION", "REQ_NO", "REQUISITION_NO"),
+    CS_NO: getStr("CS_NO", "CS_NUMBER", "CS_NUM", "CS"),
+    CS_DATE: formatDate(obj["CS_DATE"] || obj["CS_DT"]),
+    PROCURER: getStr("PROCURER", "PROCURER_NAME", "PURCHASER", "BUYER"),
+    ITEM_NAME: getStr("ITEM_NAME", "ITEM", "DESCRIPTION", "PRODUCT_NAME"),
+    TS_ID: (obj["TS_ID"] || obj["TS ID"] || obj["SPEC_ID"] || "") as string | number,
+    TECHNICAL_SPECIFICATION: getStr("TECHNICAL_SPECIFICATION", "TECH_SPEC", "SPECIFICATION", "SPECS"),
+    SUPPLIER_NAME_1: getStr("SUPPLIER_NAME_1", "SUPPLIER_1", "VENDOR_1"),
+    UNIT_RATE_1: parseNumeric(obj["UNIT_RATE_1"] || obj["RATE_1"]),
+    QTY_1: parseNumeric(obj["QTY_1"] || obj["QUANTITY_1"]),
+    TOTAL_PRICE_1: parseNumeric(obj["TOTAL_PRICE_1"] || obj["TOTAL_1"]),
+    SUPPLIER_NAME_2: getStr("SUPPLIER_NAME_2", "SUPPLIER_2", "VENDOR_2"),
+    UNIT_RATE_2: parseNumeric(obj["UNIT_RATE_2"] || obj["RATE_2"]),
+    QTY_2: parseNumeric(obj["QTY_2"] || obj["QUANTITY_2"]),
+    TOTAL_PRICE_2: parseNumeric(obj["TOTAL_PRICE_2"] || obj["TOTAL_2"]),
+    SUPPLIER_NAME_3: getStr("SUPPLIER_NAME_3", "SUPPLIER_3", "VENDOR_3"),
+    UNIT_RATE_3: parseNumeric(obj["UNIT_RATE_3"] || obj["RATE_3"]),
+    QTY_3: parseNumeric(obj["QTY_3"] || obj["QUANTITY_3"]),
+    TOTAL_PRICE_3: parseNumeric(obj["TOTAL_PRICE_3"] || obj["TOTAL_3"]),
+    SUPPLIER_NAME_4: getStr("SUPPLIER_NAME_4", "SUPPLIER_4", "VENDOR_4"),
+    UNIT_RATE_4: parseNumeric(obj["UNIT_RATE_4"] || obj["RATE_4"]),
+    QTY_4: parseNumeric(obj["QTY_4"] || obj["QUANTITY_4"]),
+    TOTAL_PRICE_4: parseNumeric(obj["TOTAL_PRICE_4"] || obj["TOTAL_4"]),
+    SUPPLIER_NAME_5: getStr("SUPPLIER_NAME_5", "SUPPLIER_5", "VENDOR_5"),
+    UNIT_RATE_5: parseNumeric(obj["UNIT_RATE_5"] || obj["RATE_5"]),
+    QTY_5: parseNumeric(obj["QTY_5"] || obj["QUANTITY_5"]),
+    TOTAL_PRICE_5: parseNumeric(obj["TOTAL_PRICE_5"] || obj["TOTAL_5"]),
+    CS_MAIN_VALUE: parseNumeric(obj["CS_MAIN_VALUE"] || obj["CS_VALUE"] || obj["TOTAL_VALUE"]),
   };
 }
